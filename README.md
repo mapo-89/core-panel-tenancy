@@ -23,16 +23,34 @@ If you install through the CorePanel installer, the addon can also be pulled in 
 Update the addon inside an installed application:
 
 ```bash
+composer update mapo-89/core-panel-tenancy
 php artisan core-panel:tenancy:update --force
 ```
 
 If you usually update CorePanel and the addon together, prefer:
 
 ```bash
+composer update mapo-89/core-panel mapo-89/core-panel-tenancy
 php artisan core-panel:update --force --with-addon-updates
 ```
 
 That path refreshes core and addon assets first and then runs the host application's outstanding migrations once.
+
+Typical update runbook for an existing installation with the addon:
+
+```bash
+composer update mapo-89/core-panel mapo-89/core-panel-tenancy
+php artisan core-panel:update --force --with-addon-updates
+npm install
+npm run build
+php artisan optimize:clear
+```
+
+If generated assets such as `resources/js/actions`, `resources/js/routes`, `resources/js/wayfinder`, `public/build`, or `public/hot` were previously committed, remove them from the Git index once after adopting the new `.gitignore`:
+
+```bash
+git rm -r --cached -- resources/js/actions resources/js/routes resources/js/wayfinder public/build public/hot
+```
 
 ## Local Package Development
 
