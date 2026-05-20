@@ -38,7 +38,7 @@
     "repositories": [{
         "name": "core-panel",
         "type": "path",
-        "url": "../..",
+        "url": "../core-panel",
         "options": {
             "symlink": false
         }

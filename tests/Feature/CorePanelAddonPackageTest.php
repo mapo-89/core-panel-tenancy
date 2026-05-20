@@ -30,7 +30,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $tenantEditPage = file_get_contents(__DIR__.'/../../stubs/resources/js/pages/Admin/Tenants/Edit.vue');
     $tenantTab = file_get_contents(__DIR__.'/../../stubs/resources/js/components/Users/UserTenantsTab.vue');
     $tenantForm = file_get_contents(__DIR__.'/../../stubs/resources/js/pages/Admin/Tenants/components/TenantForm.vue');
-    $coreAdminTheme = file_get_contents(__DIR__.'/../../../../stubs/resources/css/theme/_admin.css');
+    $coreAdminTheme = file_get_contents(__DIR__.'/../../../core-panel/stubs/resources/css/theme/_admin.css');
     $appServiceProviderStub = file_get_contents(__DIR__.'/../../stubs/app/Providers/AppServiceProvider.php');
     $addonTypesAwareUsersIndex = file_get_contents(__DIR__.'/../../stubs/resources/js/pages/Admin/Users/Index.vue');
     $tenancyServiceProviderStub = file_get_contents(__DIR__.'/../../stubs/app/Providers/TenancyServiceProvider.php');
