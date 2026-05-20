@@ -18,6 +18,22 @@ php artisan core-panel-tenancy:install
 
 If you install through the CorePanel installer, the addon can also be pulled in during `php artisan core-panel:install`.
 
+## Update
+
+Update the addon inside an installed application:
+
+```bash
+php artisan core-panel:tenancy:update --force
+```
+
+If you usually update CorePanel and the addon together, prefer:
+
+```bash
+php artisan core-panel:update --force --with-addon-updates
+```
+
+That path refreshes core and addon assets first and then runs the host application's outstanding migrations once.
+
 ## Local Package Development
 
 For local development from the monorepo:
