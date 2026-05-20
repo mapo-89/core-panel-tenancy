@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy\Console;
 
+use CorePanel\Support\Migrations\CorePanelHostMigrationRunner;
 use CorePanel\Support\SynchronizesEnvironmentFile;
 use CorePanelTenancy\Support\Install\AppServiceProviderTenancyMerger;
 use CorePanelTenancy\Support\Install\CorePanelTypesTenancyMerger;
@@ -21,6 +22,7 @@ final class InstallTenancyCommand extends Command
     public function __construct(
         private readonly Filesystem $files,
         private readonly SynchronizesEnvironmentFile $environment,
+        private readonly CorePanelHostMigrationRunner $migrations,
         private readonly AppServiceProviderTenancyMerger $appServiceProviderTenancyMerger,
         private readonly CorePanelTypesTenancyMerger $corePanelTypesTenancyMerger,
     ) {
@@ -50,7 +52,7 @@ final class InstallTenancyCommand extends Command
         $this->synchronizeTenancyEnvironment();
 
         if ((bool) $this->option('migrate')) {
-            $this->call('migrate', ['--force' => true]);
+            $this->migrations->run($this);
         }
 
         $this->components->info('CorePanel tenancy addon resources published.');

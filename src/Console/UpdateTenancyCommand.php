@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy\Console;
 
+use CorePanel\Support\Migrations\CorePanelHostMigrationRunner;
 use CorePanel\Support\PublishesCorePanelAssets;
 use CorePanel\Support\Publishing\CorePanelPublisher;
 use CorePanelTenancy\CorePanelTenancyServiceProvider;
@@ -33,8 +34,10 @@ final class UpdateTenancyCommand extends Command
 
     protected $description = 'Republish optional Tenancy addon assets after addon updates.';
 
-    public function __construct(private readonly Filesystem $files)
-    {
+    public function __construct(
+        private readonly Filesystem $files,
+        private readonly CorePanelHostMigrationRunner $migrations,
+    ) {
         parent::__construct();
     }
 
@@ -85,6 +88,10 @@ final class UpdateTenancyCommand extends Command
             foreach (self::UPDATE_TAGS as $tag) {
                 $this->publishProviderTag(CorePanelTenancyServiceProvider::class, $tag, $force);
             }
+
+            $this->migrations->run($this);
+        } else {
+            $this->components->warn('Skipping automatic migrations for external base-path tenancy updates. Run php artisan migrate in the target application manually.');
         }
 
         $this->generateWayfinderRoutes();
