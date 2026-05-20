@@ -101,7 +101,7 @@ final class InstallTenancyCommand extends Command
         $appUrl = (string) config('app.url', 'http://localhost');
         $defaultCentralDomain = (string) (parse_url($appUrl, PHP_URL_HOST) ?: 'localhost');
         $environmentCentralDomains = $this->normalizeDomains(
-            explode(',', (string) env('CENTRAL_DOMAINS', '')),
+            explode(',', (string) config('tenancy.central_domains_env', '')),
         );
         $configuredCentralDomains = $this->normalizeDomains(
             (array) config('tenancy.central_domains', []),
@@ -120,8 +120,8 @@ final class InstallTenancyCommand extends Command
             $centralDomains = [$defaultCentralDomain];
         }
 
-        $configuredCentralConnection = trim((string) env('TENANCY_CENTRAL_CONNECTION', ''));
-        $configuredDatabaseConnection = trim((string) env('DB_CONNECTION', ''));
+        $configuredCentralConnection = trim((string) config('tenancy.database.central_connection_env', ''));
+        $configuredDatabaseConnection = trim((string) config('database.default_env', ''));
         $defaultConnection = $configuredCentralConnection !== ''
             ? $configuredCentralConnection
             : ($configuredDatabaseConnection !== ''

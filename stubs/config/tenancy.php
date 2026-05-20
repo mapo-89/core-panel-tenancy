@@ -22,6 +22,7 @@ $configuredCentralDomains = array_values(array_filter(array_map(
 $templateTenantConnection = trim((string) env('TENANCY_TEMPLATE_TENANT_CONNECTION', ''));
 
 return [
+    'central_domains_env' => env('CENTRAL_DOMAINS', ''),
     'tenant_model' => Tenant::class,
     'id_generator' => UUIDGenerator::class,
     'domain_model' => Domain::class,
@@ -34,6 +35,7 @@ return [
         QueueTenancyBootstrapper::class,
     ],
     'database' => [
+        'central_connection_env' => env('TENANCY_CENTRAL_CONNECTION', ''),
         'central_connection' => env('TENANCY_CENTRAL_CONNECTION', env('DB_CONNECTION', 'pgsql')),
         'template_tenant_connection' => $templateTenantConnection !== ''
             ? $templateTenantConnection
