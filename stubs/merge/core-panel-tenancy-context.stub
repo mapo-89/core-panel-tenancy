@@ -1,0 +1,4 @@
+export type CorePanelTenancyContext = {
+    isCentral: boolean
+    isTenant: boolean
+}

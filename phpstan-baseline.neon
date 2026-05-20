@@ -1,0 +1,187 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 3
+			path: src/Console/InstallTenancyCommand.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:domains\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Domains/Tenancy/Actions/ProvisionTenantAction.php
+
+		-
+			message: '#^Method CorePanelTenancy\\Domains\\Tenancy\\Actions\\ProvisionTenantAction\:\:normalizeDomains\(\) should return Illuminate\\Support\\Collection\<int, string\> but returns Illuminate\\Support\\Collection\<int, lowercase\-string&non\-falsy\-string\>\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domains/Tenancy/Actions/ProvisionTenantAction.php
+
+		-
+			message: '#^Variable \$tenant in PHPDoc tag @var does not match assigned variable \$tenantAttributes\.$#'
+			identifier: varTag.differentVariable
+			count: 1
+			path: src/Domains/Tenancy/Actions/ProvisionTenantAction.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:domains\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: src/Domains/Tenancy/Actions/UpdateTenantAction.php
+
+		-
+			message: '#^Method CorePanelTenancy\\Domains\\Tenancy\\Actions\\UpdateTenantAction\:\:normalizeDomains\(\) should return Illuminate\\Support\\Collection\<int, string\> but returns Illuminate\\Support\\Collection\<int, lowercase\-string&non\-falsy\-string\>\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domains/Tenancy/Actions/UpdateTenantAction.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 2
+			path: src/Domains/Tenancy/Actions/UpdateTenantAction.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 2
+			path: src/Domains/Tenancy/Actions/UpdateTenantAction.php
+
+		-
+			message: '#^Class App\\Models\\User not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php
+
+		-
+			message: '#^Method CorePanelTenancy\\Domains\\Tenancy\\Actions\\UpsertTenantSuperAdminAction\:\:resolveExistingTenantSuperAdmin\(\) should return \(Illuminate\\Contracts\\Auth\\Authenticatable&Illuminate\\Database\\Eloquent\\Model\)\|null but returns Illuminate\\Contracts\\Auth\\Authenticatable\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php
+
+		-
+			message: '#^PHPDoc tag @var with type class\-string\<Illuminate\\Contracts\\Auth\\Authenticatable&Illuminate\\Database\\Eloquent\\Model\> is not subtype of native type ''App\\\\Models\\\\User''\.$#'
+			identifier: varTag.nativeType
+			count: 1
+			path: src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php
+
+		-
+			message: '#^Parameter \#1 \$tenant of method Stancl\\Tenancy\\Tenancy\:\:initialize\(\) expects int\|Stancl\\Tenancy\\Contracts\\Tenant\|string, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between class\-string\<Illuminate\\Contracts\\Auth\\Authenticatable&Illuminate\\Database\\Eloquent\\Model\> and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php
+
+		-
+			message: '#^Offset ''is_localized'' on array\{type\: string, label\: string, help\: string\|null, default\: mixed, is_public\: bool, is_localized\: bool, options\?\: list\<array\{label\: string, value\: mixed\}\>, rules\: list\<mixed\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Http/Controllers/SettingsController.php
+
+		-
+			message: '#^Offset ''is_public'' on array\{type\: string, label\: string, help\: string\|null, default\: mixed, is_public\: bool, is_localized\: bool, options\?\: list\<array\{label\: string, value\: mixed\}\>, rules\: list\<mixed\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Http/Controllers/SettingsController.php
+
+		-
+			message: '#^Offset ''type'' on array\{type\: string, label\: string, help\: string\|null, default\: mixed, is_public\: bool, is_localized\: bool, options\?\: list\<array\{label\: string, value\: mixed\}\>, rules\: list\<mixed\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Http/Controllers/SettingsController.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\{label\: string, value\: mixed\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: src/Http/Controllers/SettingsController.php
+
+		-
+			message: '#^Class App\\Models\\User not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Http/Requests/StoreTenantRequest.php
+
+		-
+			message: '#^Method CorePanelTenancy\\Http\\Requests\\StoreTenantRequest\:\:domains\(\) should return Illuminate\\Support\\Collection\<int, string\> but returns Illuminate\\Support\\Collection\<int, lowercase\-string&non\-falsy\-string\>\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Http/Requests/StoreTenantRequest.php
+
+		-
+			message: '#^Method CorePanelTenancy\\Http\\Requests\\StoreTenantRequest\:\:userModelClass\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: src/Http/Requests/StoreTenantRequest.php
+
+		-
+			message: '#^PHPDoc tag @var with type class\-string\<Illuminate\\Contracts\\Auth\\Authenticatable&Illuminate\\Database\\Eloquent\\Model\> is not subtype of native type ''App\\\\Models\\\\User''\.$#'
+			identifier: varTag.nativeType
+			count: 1
+			path: src/Http/Requests/StoreTenantRequest.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between class\-string\<Illuminate\\Contracts\\Auth\\Authenticatable&Illuminate\\Database\\Eloquent\\Model\> and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: src/Http/Requests/StoreTenantRequest.php
+
+		-
+			message: '#^Class App\\Models\\User not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Http/Requests/UpdateTenantRequest.php
+
+		-
+			message: '#^Method CorePanelTenancy\\Http\\Requests\\UpdateTenantRequest\:\:domains\(\) should return Illuminate\\Support\\Collection\<int, string\> but returns Illuminate\\Support\\Collection\<int, lowercase\-string&non\-falsy\-string\>\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Http/Requests/UpdateTenantRequest.php
+
+		-
+			message: '#^PHPDoc tag @var with type class\-string\<Illuminate\\Contracts\\Auth\\Authenticatable&Illuminate\\Database\\Eloquent\\Model\> is not subtype of native type ''App\\\\Models\\\\User''\.$#'
+			identifier: varTag.nativeType
+			count: 1
+			path: src/Http/Requests/UpdateTenantRequest.php
+
+		-
+			message: '#^Parameter \#1 \$tenant of method Stancl\\Tenancy\\Tenancy\:\:initialize\(\) expects int\|Stancl\\Tenancy\\Contracts\\Tenant\|string, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: src/Http/Requests/UpdateTenantRequest.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between class\-string\<Illuminate\\Contracts\\Auth\\Authenticatable&Illuminate\\Database\\Eloquent\\Model\> and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: src/Http/Requests/UpdateTenantRequest.php
+
+		-
+			message: '#^Method CorePanelTenancy\\Http\\Resources\\TenantResource\:\:toArray\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Http/Resources/TenantResource.php
+
+		-
+			message: '#^Class App\\Models\\Tenant not found\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Support/TenantModelResolver.php
+
+		-
+			message: '#^PHPDoc tag @var with type class\-string\<Illuminate\\Database\\Eloquent\\Model\> is not subtype of native type ''App\\\\Models\\\\Tenant''\.$#'
+			identifier: varTag.nativeType
+			count: 1
+			path: src/Support/TenantModelResolver.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between class\-string\<Illuminate\\Database\\Eloquent\\Model\> and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: src/Support/TenantModelResolver.php

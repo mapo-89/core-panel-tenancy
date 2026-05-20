@@ -1,0 +1,46 @@
+{
+    "name": "mapo-89/core-panel-tenancy",
+    "description": "Optional stancl/tenancy bootstrap addon for Laravel CorePanel.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.5",
+        "mapo-89/core-panel": "dev-main",
+        "stancl/tenancy": "^3.9"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.9",
+        "orchestra/testbench": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "CorePanelTenancy\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CorePanelTenancy\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "CorePanelTenancy\\CorePanelTenancyServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "cd ../.. && vendor/bin/pest packages/core-panel-tenancy/tests --compact",
+        "analyse": "phpstan analyse --no-progress --memory-limit=1G -c phpstan.neon.dist"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "repositories": [{
+        "name": "core-panel",
+        "type": "path",
+        "url": "../..",
+        "options": {
+            "symlink": false
+        }
+    }]
+}

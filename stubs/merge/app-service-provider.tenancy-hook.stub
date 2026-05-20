@@ -1,0 +1,19 @@
+        if (function_exists('global_asset')) {
+            Vite::createAssetPathsUsing(
+                static fn (string $path, ?bool $secure): string => global_asset($path),
+            );
+        }
+
+        $wayfinderRouteUrlNormalizer = 'CorePanelTenancy\\Support\\Wayfinder\\WayfinderRouteUrlNormalizer';
+
+        Event::listen(static function (CommandFinished $event) use ($wayfinderRouteUrlNormalizer): void {
+            if (
+                $event->command !== 'wayfinder:generate'
+                || ! class_exists($wayfinderRouteUrlNormalizer)
+            ) {
+                return;
+            }
+
+            app($wayfinderRouteUrlNormalizer)->normalize();
+        });
+
