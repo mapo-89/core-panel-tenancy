@@ -31,7 +31,7 @@
     },
     "scripts": {
         "test": "cd ../.. && vendor/bin/pest packages/core-panel-tenancy/tests --compact",
-        "analyse": "phpstan analyse --no-progress --memory-limit=1G -c phpstan.neon.dist"
+        "analyse": "phpstan analyse --debug --no-progress --memory-limit=1G -c phpstan.neon.dist"
     },
     "minimum-stability": "dev",
     "prefer-stable": true,

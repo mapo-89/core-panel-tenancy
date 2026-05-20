@@ -1,10 +1,10 @@
 includes:
-    - vendor/larastan/larastan/extension.neon
+    - ../../vendor/larastan/larastan/extension.neon
     - phpstan-baseline.neon
 
 parameters:
     bootstrapFiles:
-        - vendor/larastan/larastan/bootstrap.php
+        - ../../vendor/larastan/larastan/bootstrap.php
     paths:
         - src
     level: 6
