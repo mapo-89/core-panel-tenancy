@@ -35,12 +35,15 @@
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "repositories": [{
-        "name": "core-panel",
-        "type": "path",
-        "url": "../core-panel",
-        "options": {
-            "symlink": false
+    "repositories": [
+        {
+            "name": "core-panel",
+            "type": "path",
+            "url": "../core-panel",
+            "options": {
+                "symlink": false
+            }
         }
-    }]
+    ],
+    "version": "1.0.0"
 }
