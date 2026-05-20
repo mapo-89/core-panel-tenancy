@@ -12,6 +12,22 @@ use CorePanelTenancy\Support\Wayfinder\WayfinderRouteUrlNormalizer;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 
+function tenancyMigrationStubPath(string $filename, string $scope = ''): string
+{
+    $root = __DIR__.'/../../stubs/database/migrations'.($scope !== '' ? '/'.$scope : '');
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
+    );
+
+    foreach ($iterator as $file) {
+        if ($file->isFile() && $file->getFilename() === $filename) {
+            return $file->getPathname();
+        }
+    }
+
+    return $root.'/'.$filename;
+}
+
 it('publishes the stancl tenancy foundation for host applications', function (): void {
     $readme = file_get_contents(__DIR__.'/../../README.md');
     $installCommand = file_get_contents(__DIR__.'/../../src/Console/InstallTenancyCommand.php');
@@ -40,18 +56,18 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $appServiceProviderTenancyHook = file_get_contents(__DIR__.'/../../stubs/merge/app-service-provider.tenancy-hook.stub');
     $corePanelTenancyContextStub = file_get_contents(__DIR__.'/../../stubs/merge/core-panel-tenancy-context.stub');
     $sessionCookieMiddleware = file_get_contents(__DIR__.'/../../src/Http/Middleware/SetTenantAwareSessionCookie.php');
-    $tenantsMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/2026_01_01_000001_create_tenants_table.php');
-    $domainsMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/2026_01_01_000020_create_domains_table.php');
-    $tenantUsersMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/0001_01_01_000000_create_users_table.php');
-    $tenantSettingsMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000003_create_core_panel_settings_table.php');
-    $tenantUserGroupsMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000019_create_user_groups_table.php');
-    $tenantPermissionMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000014_create_permission_tables.php');
-    $tenantOauthAuthCodesMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/2016_06_01_000001_create_oauth_auth_codes_table.php');
-    $tenantOauthAccessTokensMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/2016_06_01_000002_create_oauth_access_tokens_table.php');
-    $tenantOauthAccessTokensLastUsedMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000022_add_last_used_at_to_oauth_access_tokens_table.php');
-    $tenantOauthClientsMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/2016_06_01_000004_create_oauth_clients_table.php');
-    $tenantOauthDeviceCodesMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/2024_06_01_000001_create_oauth_device_codes_table.php');
-    $tenantMediaMigration = file_get_contents(__DIR__.'/../../stubs/database/migrations/tenant/2019_01_01_000001_create_media_table.php');
+    $tenantsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000001_create_tenants_table.php', 'tenancy'));
+    $domainsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000020_create_domains_table.php', 'tenancy'));
+    $tenantUsersMigration = file_get_contents(tenancyMigrationStubPath('0001_01_01_000000_create_users_table.php', 'tenant'));
+    $tenantSettingsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000003_create_core_panel_settings_table.php', 'tenant'));
+    $tenantUserGroupsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000019_create_user_groups_table.php', 'tenant'));
+    $tenantPermissionMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000014_create_permission_tables.php', 'tenant'));
+    $tenantOauthAuthCodesMigration = file_get_contents(tenancyMigrationStubPath('2016_06_01_000001_create_oauth_auth_codes_table.php', 'tenant'));
+    $tenantOauthAccessTokensMigration = file_get_contents(tenancyMigrationStubPath('2016_06_01_000002_create_oauth_access_tokens_table.php', 'tenant'));
+    $tenantOauthAccessTokensLastUsedMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000022_add_last_used_at_to_oauth_access_tokens_table.php', 'tenant'));
+    $tenantOauthClientsMigration = file_get_contents(tenancyMigrationStubPath('2016_06_01_000004_create_oauth_clients_table.php', 'tenant'));
+    $tenantOauthDeviceCodesMigration = file_get_contents(tenancyMigrationStubPath('2024_06_01_000001_create_oauth_device_codes_table.php', 'tenant'));
+    $tenantMediaMigration = file_get_contents(tenancyMigrationStubPath('2019_01_01_000001_create_media_table.php', 'tenant'));
     $tenantAwareUrlGenerator = file_get_contents(__DIR__.'/../../src/Support/Media/TenantAwareUrlGenerator.php');
     $tenantDatabaseSeeder = file_get_contents(__DIR__.'/../../stubs/database/seeders/Tenant/TenantDatabaseSeeder.php');
     $tenantRolePermissionSeeder = file_get_contents(__DIR__.'/../../stubs/database/seeders/Tenant/TenantRolePermissionSeeder.php');
@@ -97,7 +113,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($provider)->toContain("routes/web/admin/settings.php' => base_path('routes/web/admin/settings.php')")
         ->and($provider)->toContain("routes/web/tenants.php' => base_path('routes/web/tenants.php')")
         ->and($provider)->not->toContain('stubs/app/Providers/AppServiceProvider.php')
-        ->and($provider)->toContain("publishableTree(__DIR__.'/../stubs/database/migrations', database_path('migrations'))")
+        ->and($provider)->toContain("publishableMigrationsTree(__DIR__.'/../stubs/database/migrations', database_path('migrations'))")
         ->and($provider)->toContain("publishableTree(__DIR__.'/../stubs/database/seeders', database_path('seeders'))")
         ->and($provider)->toContain("publishableTree(__DIR__.'/../stubs/lang', lang_path())")
         ->and($provider)->toContain("publishableTree(__DIR__.'/../resources/lang', \$this->app->langPath('vendor/core-panel-tenancy'))")
@@ -213,12 +229,12 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantOauthDeviceCodesMigration)->toContain("\$table->uuid('user_id')->nullable()->index();")
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2019_12_14_000001_create_personal_access_tokens_table.php'))->toBeFalse()
         ->and($tenantSettingsMigration)->toContain("Schema::create('settings'")
-        ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000021_create_authentication_logs_table.php'))->toBeTrue()
+        ->and(file_exists(tenancyMigrationStubPath('2026_01_01_000021_create_authentication_logs_table.php', 'tenant')))->toBeTrue()
         ->and($tenantMediaMigration)->toContain("\$table->string('model_id');")
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000004_add_core_panel_fields_to_users_table.php'))->toBeFalse()
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000016_add_core_panel_metadata_to_roles_table.php'))->toBeFalse()
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000020_add_requires_password_setup_to_users_table.php'))->toBeFalse()
-        ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000023_add_invitation_tracking_columns_to_users_table.php'))->toBeTrue()
+        ->and(file_exists(tenancyMigrationStubPath('2026_01_01_000023_add_invitation_tracking_columns_to_users_table.php', 'tenant')))->toBeTrue()
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000021_change_activity_log_morph_ids_to_strings.php'))->toBeFalse()
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000022_change_media_model_morph_ids_to_strings.php'))->toBeFalse()
         ->and($tenantAwareUrlGenerator)->toContain('class TenantAwareUrlGenerator extends DefaultUrlGenerator')

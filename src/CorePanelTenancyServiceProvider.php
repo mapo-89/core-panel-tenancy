@@ -64,7 +64,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         ], 'core-panel-tenancy-config');
 
         $this->publishes([
-            ...$this->publishableTree(__DIR__.'/../stubs/database/migrations', database_path('migrations')),
+            ...$this->publishableMigrationsTree(__DIR__.'/../stubs/database/migrations', database_path('migrations')),
             ...$this->publishableTree(__DIR__.'/../stubs/database/seeders', database_path('seeders')),
         ], 'core-panel-tenancy-migrations');
 
@@ -278,6 +278,39 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
             $sourcePath = $file->getPathname();
             $relativePath = ltrim(str_replace($sourceRoot, '', $sourcePath), DIRECTORY_SEPARATOR);
             $paths[$sourcePath] = rtrim($destinationRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$relativePath;
+        }
+
+        return $paths;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function publishableMigrationsTree(string $sourceRoot, string $destinationRoot): array
+    {
+        if (! is_dir($sourceRoot)) {
+            return [];
+        }
+
+        $paths = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($sourceRoot, RecursiveDirectoryIterator::SKIP_DOTS),
+        );
+
+        foreach ($iterator as $file) {
+            if (! $file->isFile()) {
+                continue;
+            }
+
+            $sourcePath = $file->getPathname();
+            $relativePath = ltrim(str_replace($sourceRoot, '', $sourcePath), DIRECTORY_SEPARATOR);
+            $destinationPath = basename($relativePath);
+
+            if (str_starts_with($relativePath, 'tenant'.DIRECTORY_SEPARATOR)) {
+                $destinationPath = 'tenant'.DIRECTORY_SEPARATOR.basename($relativePath);
+            }
+
+            $paths[$sourcePath] = rtrim($destinationRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$destinationPath;
         }
 
         return $paths;
