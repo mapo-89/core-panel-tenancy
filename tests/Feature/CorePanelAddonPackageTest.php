@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
 
 it('publishes the stancl tenancy foundation for host applications', function (): void {
+    $readme = file_get_contents(__DIR__.'/../../README.md');
     $installCommand = file_get_contents(__DIR__.'/../../src/Console/InstallTenancyCommand.php');
     $provider = file_get_contents(__DIR__.'/../../src/CorePanelTenancyServiceProvider.php');
     $tenantController = file_get_contents(__DIR__.'/../../src/Http/Controllers/TenantController.php');
@@ -57,7 +58,9 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $upsertTenantSuperAdminAction = file_get_contents(__DIR__.'/../../src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php');
     $tenantSettingsController = file_get_contents(__DIR__.'/../../src/Http/Controllers/SettingsController.php');
 
-    expect($installCommand)->toContain('core-panel-tenancy-core')
+    expect($readme)->toContain('Read-only split repository')
+        ->and($readme)->toContain('mapo-89/core-panel-monorepo')
+        ->and($installCommand)->toContain('core-panel-tenancy-core')
         ->and($installCommand)->toContain('core-panel-tenancy-config')
         ->and($installCommand)->toContain('core-panel-tenancy-migrations')
         ->and($installCommand)->toContain('AppServiceProviderTenancyMerger')
