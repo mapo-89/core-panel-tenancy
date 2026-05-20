@@ -254,6 +254,8 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantSettingsController)->toContain("->route(\$this->tenantAwareRouteName('core-panel.settings.index'), ['tab' => \$tab])")
         ->and($tenantSettingsController)->toContain("->route(\$this->tenantAwareRouteName('core-panel.settings.index'), ['tab' => 'appearance'])")
         ->and($tenantSettingsController)->toContain("return 'tenant.'.\$routeName;")
+        ->and($tenantSettingsController)->toContain("if (\$group === 'general' && \$key === 'app_subtitle' && \$value === null) {")
+        ->and($tenantSettingsController)->toContain("\$value = '';")
         ->and($tenantDatabaseSeeder)->toContain('TenantRolePermissionSeeder::class')
         ->and($tenantDatabaseSeeder)->toContain('CorePanelSettingsSeeder::class')
         ->and($tenantRolePermissionSeeder)->toContain('CorePanelPermissionSeeder::class')

@@ -194,11 +194,17 @@ final class SettingsController extends Controller
         $payload = [];
 
         foreach ((array) $definition['fields'] as $key => $field) {
+            $value = data_get($values, "{$key}.value");
+
+            if ($group === 'general' && $key === 'app_subtitle' && $value === null) {
+                $value = '';
+            }
+
             $payload[$key] = [
                 'is_localized' => (bool) ($field['is_localized'] ?? false),
                 'is_public' => (bool) ($field['is_public'] ?? false),
                 'type' => (string) ($field['type'] ?? 'string'),
-                'value' => data_get($values, "{$key}.value"),
+                'value' => $value,
             ];
         }
 
