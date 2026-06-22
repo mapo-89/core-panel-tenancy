@@ -379,7 +379,7 @@ it('refreshes tenancy publish tags through the addon provider for in-place updat
     $command = file_get_contents(__DIR__.'/../../src/Console/UpdateTenancyCommand.php');
 
     expect($command)->toContain('CorePanelTenancyServiceProvider::class')
-        ->and($command)->toContain('publishProviderTag(CorePanelTenancyServiceProvider::class, $tag, $force);')
+        ->and($command)->not->toContain('publishProviderTag(CorePanelTenancyServiceProvider::class, $tag, $force);')
         ->and($command)->toContain('if ($basePath === null) {')
         ->and($command)->toContain('ensureTenancyProviderRegistered($basePath);')
         ->and($command)->toContain('App\\\\Providers\\\\TenancyServiceProvider::class');

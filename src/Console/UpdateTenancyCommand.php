@@ -85,10 +85,6 @@ final class UpdateTenancyCommand extends Command
         $this->ensureTenancyProviderRegistered($basePath);
 
         if ($basePath === null) {
-            foreach (self::UPDATE_TAGS as $tag) {
-                $this->publishProviderTag(CorePanelTenancyServiceProvider::class, $tag, $force);
-            }
-
             $this->migrations->run($this);
         } else {
             $this->components->warn('Skipping automatic migrations for external base-path tenancy updates. Run php artisan migrate in the target application manually.');
