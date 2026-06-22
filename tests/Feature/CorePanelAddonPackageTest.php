@@ -28,6 +28,24 @@ function tenancyMigrationStubPath(string $filename, string $scope = ''): string
     return $root.'/'.$filename;
 }
 
+function makeTenancyUpdateBasePath(string $suffix): string
+{
+    return sys_get_temp_dir().'/core-panel-tenancy-update-'.bin2hex(random_bytes(4)).'-'.$suffix;
+}
+
+function readTenancyPublishManifest(string $basePath): array
+{
+    $contents = file_get_contents($basePath.'/storage/app/core-panel/published.json');
+
+    expect($contents)->not->toBeFalse();
+
+    $decoded = json_decode((string) $contents, true, 512, JSON_THROW_ON_ERROR);
+
+    expect($decoded)->toBeArray();
+
+    return $decoded;
+}
+
 it('publishes the stancl tenancy foundation for host applications', function (): void {
     $readme = file_get_contents(__DIR__.'/../../README.md');
     $installCommand = file_get_contents(__DIR__.'/../../src/Console/InstallTenancyCommand.php');
@@ -88,6 +106,9 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($installCommand)->toContain('core-panel-tenancy-core')
         ->and($installCommand)->toContain('core-panel-tenancy-config')
         ->and($installCommand)->toContain('core-panel-tenancy-migrations')
+        ->and($installCommand)->toContain('CorePanelPublisher::class')
+        ->and($installCommand)->toContain('publishForProvider(')
+        ->and($installCommand)->not->toContain("\$this->call('vendor:publish'")
         ->and($installCommand)->toContain('AppServiceProviderTenancyMerger')
         ->and($installCommand)->toContain('CorePanelTypesTenancyMerger')
         ->and($installCommand)->toContain('appServiceProviderTenancyMerger->merge();')
@@ -124,6 +145,9 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($provider)->toContain("publishableTree(__DIR__.'/../stubs/lang', lang_path())")
         ->and($provider)->toContain("publishableTree(__DIR__.'/../resources/lang', \$this->app->langPath('vendor/core-panel-tenancy'))")
         ->and($provider)->toContain("stubs/resources/js/pages/Admin/Users/Index.vue' => resource_path('js/pages/Admin/Users/Index.vue')")
+        ->and($tenantUsersOverride)->toContain('resyncManagedRoles')
+        ->and($tenantUsersOverride)->toContain("'assignableRoles'")
+        ->and($tenantUsersOverride)->toContain("'canAssignRoles'")
         ->and($appServiceProviderTenancyMerger)->toContain('stubs/app/Providers/AppServiceProvider.php')
         ->and($appServiceProviderTenancyMerger)->toContain('stubs/merge/app-service-provider.tenancy-hook.stub')
         ->and($appServiceProviderTenancyHook)->toContain('Vite::createAssetPathsUsing(')
@@ -363,7 +387,7 @@ it('limits tenancy update dry-runs to tenancy provider tags', function (): void 
     Artisan::call('core-panel:tenancy:update', [
         '--dry-run' => true,
         '--force' => true,
-        '--base-path' => sys_get_temp_dir().'/core-panel-tenancy-update-'.bin2hex(random_bytes(4)),
+        '--base-path' => makeTenancyUpdateBasePath('dry-run'),
     ]);
 
     $output = Artisan::output();
@@ -375,10 +399,50 @@ it('limits tenancy update dry-runs to tenancy provider tags', function (): void 
         ->and($output)->not->toContain('core-panel-views');
 });
 
+it('adopts legacy tenancy publishes into the manifest during force updates', function (): void {
+    $basePath = makeTenancyUpdateBasePath('legacy-adopt');
+    $target = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
+    $source = __DIR__.'/../../stubs/resources/js/pages/Admin/Users/Index.vue';
+
+    mkdir(dirname($target), 0777, true);
+    file_put_contents($target, "<template>\n    <div>legacy tenancy users</div>\n</template>\n");
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--force' => true,
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $manifest = readTenancyPublishManifest($basePath);
+    $backups = glob($basePath.'/.core-panel-backups/*/resources/js/pages/Admin/Users/Index.vue');
+
+    expect(file_get_contents($target))->toBe(file_get_contents($source))
+        ->and($manifest['files'][$target] ?? null)->toBeArray()
+        ->and($manifest['files'][$target]['tag'] ?? null)->toBe('core-panel-tenancy-ui')
+        ->and($backups)->not->toBeFalse()
+        ->and($backups)->not->toBeEmpty()
+        ->and(file_get_contents($backups[0]))->toContain('legacy tenancy users');
+});
+
+it('reports legacy tenancy publishes as conflicts without force', function (): void {
+    $basePath = makeTenancyUpdateBasePath('legacy-conflict');
+    $target = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
+
+    mkdir(dirname($target), 0777, true);
+    file_put_contents($target, "<template>\n    <div>legacy tenancy users</div>\n</template>\n");
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(1);
+
+    expect(file_get_contents($target))->toContain('legacy tenancy users')
+        ->and(file_exists($basePath.'/storage/app/core-panel/published.json'))->toBeTrue();
+});
+
 it('refreshes tenancy publish tags through the addon provider for in-place updates', function (): void {
     $command = file_get_contents(__DIR__.'/../../src/Console/UpdateTenancyCommand.php');
 
     expect($command)->toContain('CorePanelTenancyServiceProvider::class')
+        ->and($command)->toContain('adoptUnmanagedExisting: true')
         ->and($command)->not->toContain('publishProviderTag(CorePanelTenancyServiceProvider::class, $tag, $force);')
         ->and($command)->toContain('if ($basePath === null) {')
         ->and($command)->toContain('ensureTenancyProviderRegistered($basePath);')

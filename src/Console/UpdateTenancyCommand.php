@@ -55,6 +55,7 @@ final class UpdateTenancyCommand extends Command
             $force,
             $dryRun,
             $basePath,
+            adoptUnmanagedExisting: true,
         );
 
         $this->table(
@@ -80,6 +81,10 @@ final class UpdateTenancyCommand extends Command
             return $this->containsConflicts($result['changes'])
                 ? self::FAILURE
                 : self::SUCCESS;
+        }
+
+        if ($this->containsConflicts($result['changes'])) {
+            return self::FAILURE;
         }
 
         $this->ensureTenancyProviderRegistered($basePath);

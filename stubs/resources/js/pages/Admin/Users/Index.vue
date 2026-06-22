@@ -53,6 +53,8 @@ type UserManagementTab = 'users' | 'user_groups' | 'roles' | 'tenants'
 
 const props = defineProps<{
     assignableUsers: AssignableUser[]
+    assignableRoles: RoleRecord[]
+    canAssignRoles: boolean
     capabilities: UserCapabilities
     defaultRoles: ManagedRoleRecord[]
     filters: {
@@ -118,7 +120,7 @@ const tabSchema = computed<TabsSchema>(() => ({
             componentProps: {
                 userGroups: props.userGroups,
             },
-            icon: 'columns',
+            icon: 'sitemap',
             key: 'user_groups',
             label: 'navigation.user_groups',
         },
@@ -174,10 +176,11 @@ function reloadTenants(): void {
 function openCreateDialog(): void {
     dialog.open(UserFormDialog, {
         data: {
+            canAssignRoles: props.canAssignRoles,
             capabilities: props.capabilities,
             onSaved: reloadUsers,
             roleLabels: props.roleLabels,
-            roles: props.roles,
+            roles: props.assignableRoles,
             userGroupOptions: props.userGroupOptions,
         },
         props: {
@@ -193,10 +196,11 @@ function openCreateDialog(): void {
 function openEditDialog(user: UserRecord): void {
     dialog.open(UserFormDialog, {
         data: {
+            canAssignRoles: props.canAssignRoles,
             capabilities: props.capabilities,
             onSaved: reloadUsers,
             roleLabels: props.roleLabels,
-            roles: props.roles,
+            roles: props.assignableRoles,
             userGroupOptions: props.userGroupOptions,
             user,
         },
@@ -259,6 +263,8 @@ function openCreateTenantDialog(): void {
 function reloadRoles(): void {
     router.reload({
         only: [
+            'assignableRoles',
+            'canAssignRoles',
             'defaultRoles',
             'permissionDefaults',
             'permissionGroups',

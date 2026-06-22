@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace CorePanelTenancy\Console;
 
 use CorePanel\Support\Migrations\CorePanelHostMigrationRunner;
+use CorePanel\Support\Publishing\CorePanelPublisher;
 use CorePanel\Support\SynchronizesEnvironmentFile;
+use CorePanelTenancy\CorePanelTenancyServiceProvider;
 use CorePanelTenancy\Support\Install\AppServiceProviderTenancyMerger;
 use CorePanelTenancy\Support\Install\CorePanelTypesTenancyMerger;
 use Illuminate\Console\Command;
@@ -13,6 +15,17 @@ use Illuminate\Filesystem\Filesystem;
 
 final class InstallTenancyCommand extends Command
 {
+    /**
+     * @var list<string>
+     */
+    private const INSTALL_TAGS = [
+        'core-panel-tenancy-core',
+        'core-panel-tenancy-config',
+        'core-panel-tenancy-migrations',
+        'core-panel-tenancy-lang',
+        'core-panel-tenancy-ui',
+    ];
+
     protected $signature = 'core-panel:tenancy:install
         {--force : Overwrite published tenancy resources}
         {--migrate : Run database migrations after publishing}';
@@ -31,19 +44,26 @@ final class InstallTenancyCommand extends Command
 
     public function handle(): int
     {
-        foreach ([
-            'core-panel-tenancy-core',
-            'core-panel-tenancy-config',
-            'core-panel-tenancy-migrations',
-            'core-panel-tenancy-lang',
-            'core-panel-tenancy-ui',
-        ] as $tag) {
-            $this->call('vendor:publish', [
-                '--provider' => 'CorePanelTenancy\\CorePanelTenancyServiceProvider',
-                '--tag' => $tag,
-                '--force' => (bool) $this->option('force'),
-            ]);
-        }
+        $result = app(CorePanelPublisher::class)->publishForProvider(
+            CorePanelTenancyServiceProvider::class,
+            self::INSTALL_TAGS,
+            (bool) $this->option('force'),
+        );
+
+        $this->table(
+            ['Tag', 'Status', 'Reason', 'Destination'],
+            array_map(
+                static fn (array $change): array => [
+                    'tag' => $change['tag'],
+                    'status' => $change['status'],
+                    'reason' => $change['reason'],
+                    'destination' => $change['destination'],
+                ],
+                $result['changes'],
+            ),
+        );
+
+        $this->components->info('Manifest: '.$result['manifestPath']);
 
         $this->removeObsoletePublishedFiles();
         $this->ensureTenancyProviderRegistered();
