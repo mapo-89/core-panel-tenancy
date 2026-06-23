@@ -194,6 +194,10 @@ function openCreateDialog(): void {
 }
 
 function openEditDialog(user: UserRecord): void {
+    if (!user.canUpdate) {
+        return
+    }
+
     dialog.open(UserFormDialog, {
         data: {
             canAssignRoles: props.canAssignRoles,
@@ -300,7 +304,7 @@ function resyncManagedRoles(): void {
         <template #page-actions>
             <div class="flex flex-wrap gap-2">
                 <Button
-                    v-if="activeTab === 'users'"
+                    v-if="activeTab === 'users' && can('users.create')"
                     class="gap-2"
                     @click="openCreateDialog"
                 >

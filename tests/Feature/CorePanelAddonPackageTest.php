@@ -423,6 +423,40 @@ it('adopts legacy tenancy publishes into the manifest during force updates', fun
         ->and(file_get_contents($backups[0]))->toContain('legacy tenancy users');
 });
 
+it('syncs core user types when updating tenancy user overrides directly', function (): void {
+    $basePath = makeTenancyUpdateBasePath('core-types-sync');
+    $tenantUsersTarget = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
+    $tenantUsersSource = __DIR__.'/../../stubs/resources/js/pages/Admin/Users/Index.vue';
+    $coreTypesTarget = $basePath.'/resources/js/types/core-panel.ts';
+    $coreTypesSource = __DIR__.'/../../../core-panel/stubs/resources/js/types/core-panel.ts';
+
+    mkdir(dirname($tenantUsersTarget), 0777, true);
+    mkdir(dirname($coreTypesTarget), 0777, true);
+    file_put_contents($tenantUsersTarget, "<template>\n    <div>legacy tenancy users</div>\n</template>\n");
+    file_put_contents($coreTypesTarget, "export type UserRecord = {\n    id: string\n}\n");
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--force' => true,
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $scaffoldManifest = json_decode(
+        (string) file_get_contents($basePath.'/storage/app/core-panel/scaffolds.json'),
+        true,
+        512,
+        JSON_THROW_ON_ERROR,
+    );
+    $typeBackups = glob($basePath.'/.core-panel-backups/*/resources/js/types/core-panel.ts');
+
+    expect(file_get_contents($tenantUsersTarget))->toBe(file_get_contents($tenantUsersSource))
+        ->and(file_get_contents($coreTypesTarget))->toBe(file_get_contents($coreTypesSource))
+        ->and(file_get_contents($coreTypesTarget))->toContain('canUpdate: boolean')
+        ->and($scaffoldManifest['files']['resources/js/types/core-panel.ts'] ?? null)->toBeArray()
+        ->and($typeBackups)->not->toBeFalse()
+        ->and($typeBackups)->not->toBeEmpty()
+        ->and(file_get_contents($typeBackups[0]))->not->toContain('canUpdate');
+});
+
 it('reports legacy tenancy publishes as conflicts without force', function (): void {
     $basePath = makeTenancyUpdateBasePath('legacy-conflict');
     $target = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
