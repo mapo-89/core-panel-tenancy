@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Tenant;
+use CorePanel\Support\Migrations\MigrationPathResolver;
 use Illuminate\Support\Str;
 use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper;
@@ -75,7 +76,7 @@ return [
     'routes' => true,
     'migration_parameters' => [
         '--force' => true,
-        '--path' => [database_path('migrations/tenant')],
+        '--path' => MigrationPathResolver::tenant(),
         '--realpath' => true,
     ],
     'seeder_parameters' => [

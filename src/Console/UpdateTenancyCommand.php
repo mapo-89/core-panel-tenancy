@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy\Console;
 
-use CorePanel\Support\Migrations\CorePanelHostMigrationRunner;
+use CorePanel\Support\Migrations\HostMigrationRunner;
 use CorePanel\Support\PublishesCorePanelAssets;
 use CorePanel\Support\Publishing\CorePanelPublisher;
 use CorePanel\Support\ScaffoldsCorePanelStubs;
@@ -46,7 +46,7 @@ final class UpdateTenancyCommand extends Command
 
     public function __construct(
         private readonly Filesystem $files,
-        private readonly CorePanelHostMigrationRunner $migrations,
+        private readonly HostMigrationRunner $migrations,
         private readonly ScaffoldsCorePanelStubs $stubs,
     ) {
         parent::__construct();

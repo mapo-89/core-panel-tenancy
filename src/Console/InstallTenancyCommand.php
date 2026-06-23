@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy\Console;
 
-use CorePanel\Support\Migrations\CorePanelHostMigrationRunner;
+use CorePanel\Support\Migrations\HostMigrationRunner;
 use CorePanel\Support\Publishing\CorePanelPublisher;
 use CorePanel\Support\SynchronizesEnvironmentFile;
 use CorePanelTenancy\CorePanelTenancyServiceProvider;
@@ -35,7 +35,7 @@ final class InstallTenancyCommand extends Command
     public function __construct(
         private readonly Filesystem $files,
         private readonly SynchronizesEnvironmentFile $environment,
-        private readonly CorePanelHostMigrationRunner $migrations,
+        private readonly HostMigrationRunner $migrations,
         private readonly AppServiceProviderTenancyMerger $appServiceProviderTenancyMerger,
         private readonly CorePanelTypesTenancyMerger $corePanelTypesTenancyMerger,
     ) {

@@ -89,6 +89,8 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $tenantAwareUrlGenerator = file_get_contents(__DIR__.'/../../src/Support/Media/TenantAwareUrlGenerator.php');
     $tenantDatabaseSeeder = file_get_contents(__DIR__.'/../../stubs/database/seeders/Tenant/TenantDatabaseSeeder.php');
     $tenantRolePermissionSeeder = file_get_contents(__DIR__.'/../../stubs/database/seeders/Tenant/TenantRolePermissionSeeder.php');
+    $tenantGermanTranslations = file_get_contents(__DIR__.'/../../stubs/lang/de/page-tenants.php');
+    $tenantEnglishTranslations = file_get_contents(__DIR__.'/../../stubs/lang/en/page-tenants.php');
     $upsertTenantSuperAdminAction = file_get_contents(__DIR__.'/../../src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php');
     $tenantSettingsController = file_get_contents(__DIR__.'/../../src/Http/Controllers/SettingsController.php');
 
@@ -174,9 +176,10 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($updateTenantRequest)->toContain('shouldManageTenantSuperAdmin')
         ->and($upsertTenantSuperAdminAction)->toContain("Role::findOrCreate('super-admin', 'web');")
         ->and($tenancyConfig)->toContain("'tenant_model' => Tenant::class")
+        ->and($tenancyConfig)->toContain('use CorePanel\Support\Migrations\MigrationPathResolver;')
         ->and($tenancyConfig)->toContain('UniversalRoutes::class')
         ->and($tenancyConfig)->toContain("'asset_helper_tenancy' => false")
-        ->and($tenancyConfig)->toContain("database_path('migrations/tenant')")
+        ->and($tenancyConfig)->toContain("'--path' => MigrationPathResolver::tenant()")
         ->and($tenancyConfig)->toContain("'--class' => 'Database\\\\Seeders\\\\Tenant\\\\TenantDatabaseSeeder'")
         ->and($tenantUsersOverride)->toContain("key: 'tenants'")
         ->and($tenantUsersOverride)->toContain("label: 'page-tenants.page_title'")
@@ -207,6 +210,10 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantForm)->toContain(':min-length="8"')
         ->and($tenantForm)->toContain(':match-password="form.super_admin_password"')
         ->and($tenantForm)->not->toContain('const showPasswordRequirements = computed(() => {')
+        ->and($tenantGermanTranslations)->toContain("'assigned_domains' =>")
+        ->and($tenantGermanTranslations)->toContain("'super_admin_password_hint' =>")
+        ->and($tenantEnglishTranslations)->toContain("'assigned_domains' =>")
+        ->and($tenantEnglishTranslations)->toContain("'super_admin_password_hint' =>")
         ->and($sessionCookieMiddleware)->toContain("\$cookieName = \$defaultCookie.'_'.\$suffix;")
         ->and($sessionCookieMiddleware)->toContain("config()->set('session.cookie_base', \$defaultCookie);")
         ->and($sessionCookieMiddleware)->toContain("config()->set('session.cookie', \$cookieName);")
