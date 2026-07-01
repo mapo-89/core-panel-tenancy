@@ -227,7 +227,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantRouteFile)->toContain('InitializeTenancyByDomain::class')
         ->and($tenantRouteFile)->toContain('PreventAccessFromCentralDomains::class')
         ->and($tenantRouteFile)->toContain("Route::name('tenant.')->group(function () use")
-        ->and($tenantRouteFile)->not->toContain("foreach (\$webRoutes['public'] as \$publicRouteFile)")
+        ->and($tenantRouteFile)->toContain("foreach (\$webRoutes['public'] as \$publicRouteFile)")
         ->and($tenantRouteFile)->not->toContain('routes/web/tenants.php')
         ->and($universalRouteFile)->not->toContain("\$loadUniversalWebRouteFile('auth.php');")
         ->and($universalRouteFile)->toContain("\$loadUniversalWebRouteFile('platform.php');")

@@ -34,6 +34,10 @@ Route::middleware($tenantWebMiddleware)->group(function () use ($corePanelRouteM
     Route::name('tenant.')->group(function () use ($corePanelRouteMiddleware, $loadTenantWebRouteFile, $webRoutes): void {
         Route::redirect('/', config('core-panel.route_prefix', 'admin'));
 
+        foreach ($webRoutes['public'] as $publicRouteFile) {
+            $loadTenantWebRouteFile($publicRouteFile);
+        }
+
         Route::middleware([...$corePanelRouteMiddleware, 'core-panel.verified'])->group(function () use ($loadTenantWebRouteFile, $webRoutes): void {
             foreach ($webRoutes['authenticated_without_permission'] as $authenticatedRouteFile) {
                 $loadTenantWebRouteFile($authenticatedRouteFile);
