@@ -194,8 +194,11 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantTab)->toContain("from '@/routes/tenants'")
         ->and($tenantTab)->toContain('primary_domain')
         ->and($tenantTab)->toContain('database_name')
+        ->and($tenantTab)->toContain("import TableBuilderDataTable from '@core-panel/components/TableBuilder/DataTable.vue'")
+        ->and($tenantTab)->toContain('<TableBuilderDataTable')
+        ->and($tenantTab)->toContain("mode: 'local'")
         ->and($tenantTab)->toContain('cp-datatable__action-button')
-        ->and($tenantTab)->toContain('grid gap-3 px-[1.125rem] pt-[1.125rem] pb-1')
+        ->and($tenantTab)->toContain('surface-class="cp-user-tenants-tab__surface"')
         ->and($coreAdminTheme)->toContain('.cp-datatable__action-button {')
         ->and($tenantForm)->toContain('index as tenantsIndex')
         ->and($tenantForm)->toContain('store as storeTenant')
@@ -430,16 +433,23 @@ it('adopts legacy tenancy publishes into the manifest during force updates', fun
         ->and(file_get_contents($backups[0]))->toContain('legacy tenancy users');
 });
 
-it('syncs core user types when updating tenancy user overrides directly', function (): void {
+it('syncs core tablebuilder assets and user types when updating tenancy user overrides directly', function (): void {
     $basePath = makeTenancyUpdateBasePath('core-types-sync');
     $tenantUsersTarget = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
     $tenantUsersSource = __DIR__.'/../../stubs/resources/js/pages/Admin/Users/Index.vue';
+    $coreDataTableTarget = $basePath.'/resources/js/components/TableBuilder/DataTable.vue';
+    $coreDataTableSource = __DIR__.'/../../../core-panel/resources/js/components/TableBuilder/DataTable.vue';
+    $coreUseDataTableTarget = $basePath.'/resources/js/components/TableBuilder/useDataTable.ts';
+    $coreUseDataTableSource = __DIR__.'/../../../core-panel/resources/js/components/TableBuilder/useDataTable.ts';
     $coreTypesTarget = $basePath.'/resources/js/types/core-panel.ts';
     $coreTypesSource = __DIR__.'/../../../core-panel/stubs/resources/js/types/core-panel.ts';
 
     mkdir(dirname($tenantUsersTarget), 0777, true);
+    mkdir(dirname($coreDataTableTarget), 0777, true);
     mkdir(dirname($coreTypesTarget), 0777, true);
     file_put_contents($tenantUsersTarget, "<template>\n    <div>legacy tenancy users</div>\n</template>\n");
+    file_put_contents($coreDataTableTarget, "<script setup lang=\"ts\">\nconst legacyTable = true\n</script>\n");
+    file_put_contents($coreUseDataTableTarget, "export function useDataTable(schema) {\n    return { rows: schema.rows }\n}\n");
     file_put_contents($coreTypesTarget, "export type UserRecord = {\n    id: string\n}\n");
 
     $this->artisan('core-panel:tenancy:update', [
@@ -453,12 +463,26 @@ it('syncs core user types when updating tenancy user overrides directly', functi
         512,
         JSON_THROW_ON_ERROR,
     );
+    $dataTableBackups = glob($basePath.'/.core-panel-backups/*/resources/js/components/TableBuilder/DataTable.vue');
+    $useDataTableBackups = glob($basePath.'/.core-panel-backups/*/resources/js/components/TableBuilder/useDataTable.ts');
     $typeBackups = glob($basePath.'/.core-panel-backups/*/resources/js/types/core-panel.ts');
 
     expect(file_get_contents($tenantUsersTarget))->toBe(file_get_contents($tenantUsersSource))
+        ->and(file_get_contents($coreDataTableTarget))->toBe(file_get_contents($coreDataTableSource))
+        ->and(file_get_contents($coreDataTableTarget))->toContain('const table = useDataTable(() => props.schema, {')
+        ->and(file_get_contents($coreUseDataTableTarget))->toBe(file_get_contents($coreUseDataTableSource))
+        ->and(file_get_contents($coreUseDataTableTarget))->toContain('schema: MaybeRefOrGetter<Readonly<DataTableSchema>>')
         ->and(file_get_contents($coreTypesTarget))->toBe(file_get_contents($coreTypesSource))
         ->and(file_get_contents($coreTypesTarget))->toContain('canUpdate: boolean')
+        ->and($scaffoldManifest['files']['resources/js/components/TableBuilder/DataTable.vue'] ?? null)->toBeArray()
+        ->and($scaffoldManifest['files']['resources/js/components/TableBuilder/useDataTable.ts'] ?? null)->toBeArray()
         ->and($scaffoldManifest['files']['resources/js/types/core-panel.ts'] ?? null)->toBeArray()
+        ->and($dataTableBackups)->not->toBeFalse()
+        ->and($dataTableBackups)->not->toBeEmpty()
+        ->and(file_get_contents($dataTableBackups[0]))->toContain('legacyTable')
+        ->and($useDataTableBackups)->not->toBeFalse()
+        ->and($useDataTableBackups)->not->toBeEmpty()
+        ->and(file_get_contents($useDataTableBackups[0]))->not->toContain('MaybeRefOrGetter')
         ->and($typeBackups)->not->toBeFalse()
         ->and($typeBackups)->not->toBeEmpty()
         ->and(file_get_contents($typeBackups[0]))->not->toContain('canUpdate');

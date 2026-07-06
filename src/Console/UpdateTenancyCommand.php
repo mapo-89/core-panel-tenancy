@@ -33,6 +33,8 @@ final class UpdateTenancyCommand extends Command
      * @var list<string>
      */
     private const CORE_VERSIONED_SCAFFOLDS = [
+        'resources/js/components/TableBuilder/DataTable.vue',
+        'resources/js/components/TableBuilder/useDataTable.ts',
         'resources/js/types/core-panel.ts',
     ];
 
