@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 
 it('uses the tenant asset route for logo urls inside tenant context', function (): void {
+    config()->set('core-panel.files.disk', 'public');
+    config()->set('core-panel.files.logo.disk', 'public');
     Storage::fake('public');
     $this->migrateScaffoldDatabase();
 
