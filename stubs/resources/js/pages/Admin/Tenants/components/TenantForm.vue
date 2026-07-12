@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { router, useForm } from '@inertiajs/vue3'
 import { computed, inject } from 'vue'
-import TranslatedPassword from '@/components/TranslatedPassword.vue'
+import TranslatedPassword from '@core-panel/components/TranslatedPassword.vue'
 
 import {
     index as tenantsIndex,

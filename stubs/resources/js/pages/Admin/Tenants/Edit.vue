@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3'
 
-import AppLayout from '@/layouts/AppLayout.vue'
+import AppLayout from '@core-panel/layouts/AppLayout.vue'
 import TenantForm from '@/pages/Admin/Tenants/components/TenantForm.vue'
 
 type TenantManagementRecord = {

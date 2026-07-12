@@ -7,7 +7,6 @@ namespace CorePanelTenancy\Console;
 use CorePanel\Support\Migrations\HostMigrationRunner;
 use CorePanel\Support\PublishesCorePanelAssets;
 use CorePanel\Support\Publishing\CorePanelPublisher;
-use CorePanel\Support\ScaffoldsCorePanelStubs;
 use CorePanelTenancy\CorePanelTenancyServiceProvider;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
@@ -27,17 +26,6 @@ final class UpdateTenancyCommand extends Command
         'core-panel-tenancy-ui',
     ];
 
-    /**
-     * Core scaffolds required by tenancy UI overrides.
-     *
-     * @var list<string>
-     */
-    private const CORE_VERSIONED_SCAFFOLDS = [
-        'resources/js/components/TableBuilder/DataTable.vue',
-        'resources/js/components/TableBuilder/useDataTable.ts',
-        'resources/js/types/core-panel.ts',
-    ];
-
     protected $signature = 'core-panel:tenancy:update
         {--dry-run : Show planned changes without writing files}
         {--force : Overwrite published files after creating a backup}
@@ -49,7 +37,6 @@ final class UpdateTenancyCommand extends Command
     public function __construct(
         private readonly Filesystem $files,
         private readonly HostMigrationRunner $migrations,
-        private readonly ScaffoldsCorePanelStubs $stubs,
     ) {
         parent::__construct();
     }
@@ -61,13 +48,6 @@ final class UpdateTenancyCommand extends Command
             : null;
         $dryRun = (bool) $this->option('dry-run');
         $force = (bool) $this->option('force');
-
-        if (! $dryRun) {
-            $this->stubs->synchronizeVersionedScaffolds(
-                self::CORE_VERSIONED_SCAFFOLDS,
-                $basePath,
-            );
-        }
 
         $result = app(CorePanelPublisher::class)->updateForProvider(
             CorePanelTenancyServiceProvider::class,

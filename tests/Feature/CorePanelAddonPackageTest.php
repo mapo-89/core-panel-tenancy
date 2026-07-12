@@ -208,7 +208,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantForm)->toContain('database_name')
         ->and($tenantForm)->toContain('page-tenants.tenant_id_hint')
         ->and($tenantForm)->toContain('page-tenants.database_name_hint')
-        ->and($tenantForm)->toContain("import TranslatedPassword from '@/components/TranslatedPassword.vue'")
+        ->and($tenantForm)->toContain("import TranslatedPassword from '@core-panel/components/TranslatedPassword.vue'")
         ->and($tenantForm)->toContain('<TranslatedPassword')
         ->and($tenantForm)->toContain(':min-length="8"')
         ->and($tenantForm)->toContain(':match-password="form.super_admin_password"')
@@ -433,16 +433,13 @@ it('adopts legacy tenancy publishes into the manifest during force updates', fun
         ->and(file_get_contents($backups[0]))->toContain('legacy tenancy users');
 });
 
-it('syncs core tablebuilder assets and user types when updating tenancy user overrides directly', function (): void {
+it('leaves core vendor-first assets unmanaged when updating tenancy user overrides directly', function (): void {
     $basePath = makeTenancyUpdateBasePath('core-types-sync');
     $tenantUsersTarget = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
     $tenantUsersSource = __DIR__.'/../../stubs/resources/js/pages/Admin/Users/Index.vue';
     $coreDataTableTarget = $basePath.'/resources/js/components/TableBuilder/DataTable.vue';
-    $coreDataTableSource = __DIR__.'/../../../core-panel/resources/js/components/TableBuilder/DataTable.vue';
     $coreUseDataTableTarget = $basePath.'/resources/js/components/TableBuilder/useDataTable.ts';
-    $coreUseDataTableSource = __DIR__.'/../../../core-panel/resources/js/components/TableBuilder/useDataTable.ts';
     $coreTypesTarget = $basePath.'/resources/js/types/core-panel.ts';
-    $coreTypesSource = __DIR__.'/../../../core-panel/stubs/resources/js/types/core-panel.ts';
 
     mkdir(dirname($tenantUsersTarget), 0777, true);
     mkdir(dirname($coreDataTableTarget), 0777, true);
@@ -457,8 +454,8 @@ it('syncs core tablebuilder assets and user types when updating tenancy user ove
         '--base-path' => $basePath,
     ])->assertExitCode(0);
 
-    $scaffoldManifest = json_decode(
-        (string) file_get_contents($basePath.'/storage/app/core-panel/scaffolds.json'),
+    $publishedManifest = json_decode(
+        (string) file_get_contents($basePath.'/storage/app/core-panel/published.json'),
         true,
         512,
         JSON_THROW_ON_ERROR,
@@ -468,24 +465,18 @@ it('syncs core tablebuilder assets and user types when updating tenancy user ove
     $typeBackups = glob($basePath.'/.core-panel-backups/*/resources/js/types/core-panel.ts');
 
     expect(file_get_contents($tenantUsersTarget))->toBe(file_get_contents($tenantUsersSource))
-        ->and(file_get_contents($coreDataTableTarget))->toBe(file_get_contents($coreDataTableSource))
-        ->and(file_get_contents($coreDataTableTarget))->toContain('const table = useDataTable(() => props.schema, {')
-        ->and(file_get_contents($coreUseDataTableTarget))->toBe(file_get_contents($coreUseDataTableSource))
-        ->and(file_get_contents($coreUseDataTableTarget))->toContain('schema: MaybeRefOrGetter<Readonly<DataTableSchema>>')
-        ->and(file_get_contents($coreTypesTarget))->toBe(file_get_contents($coreTypesSource))
-        ->and(file_get_contents($coreTypesTarget))->toContain('canUpdate: boolean')
-        ->and($scaffoldManifest['files']['resources/js/components/TableBuilder/DataTable.vue'] ?? null)->toBeArray()
-        ->and($scaffoldManifest['files']['resources/js/components/TableBuilder/useDataTable.ts'] ?? null)->toBeArray()
-        ->and($scaffoldManifest['files']['resources/js/types/core-panel.ts'] ?? null)->toBeArray()
+        ->and(file_get_contents($coreDataTableTarget))->toContain('const legacyTable = true')
+        ->and(file_get_contents($coreUseDataTableTarget))->toContain('return { rows: schema.rows }')
+        ->and(file_get_contents($coreTypesTarget))->toContain('id: string')
+        ->and($publishedManifest['files'][$coreDataTableTarget] ?? null)->toBeNull()
+        ->and($publishedManifest['files'][$coreUseDataTableTarget] ?? null)->toBeNull()
+        ->and($publishedManifest['files'][$coreTypesTarget] ?? null)->toBeNull()
         ->and($dataTableBackups)->not->toBeFalse()
-        ->and($dataTableBackups)->not->toBeEmpty()
-        ->and(file_get_contents($dataTableBackups[0]))->toContain('legacyTable')
+        ->and($dataTableBackups)->toBeEmpty()
         ->and($useDataTableBackups)->not->toBeFalse()
-        ->and($useDataTableBackups)->not->toBeEmpty()
-        ->and(file_get_contents($useDataTableBackups[0]))->not->toContain('MaybeRefOrGetter')
+        ->and($useDataTableBackups)->toBeEmpty()
         ->and($typeBackups)->not->toBeFalse()
-        ->and($typeBackups)->not->toBeEmpty()
-        ->and(file_get_contents($typeBackups[0]))->not->toContain('canUpdate');
+        ->and($typeBackups)->toBeEmpty();
 });
 
 it('reports legacy tenancy publishes as conflicts without force', function (): void {

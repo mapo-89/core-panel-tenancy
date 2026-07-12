@@ -6,8 +6,8 @@ import { trans } from 'laravel-vue-i18n'
 import { useConfirm } from 'primevue/useconfirm'
 import { useDialog } from 'primevue/usedialog'
 
-import AppIcon from '@/components/AppIcon.vue'
-import { useCan } from '@/composables/useCan'
+import AppIcon from '@core-panel/components/AppIcon.vue'
+import { useCan } from '@core-panel/composables/useCan'
 import TenantForm from '@/pages/Admin/Tenants/components/TenantForm.vue'
 import {
     destroy as destroyTenant,
