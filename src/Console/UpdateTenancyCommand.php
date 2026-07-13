@@ -23,6 +23,7 @@ final class UpdateTenancyCommand extends Command
         'core-panel-tenancy-config',
         'core-panel-tenancy-migrations',
         'core-panel-tenancy-lang',
+        'core-panel-tenancy-lang-vendor',
         'core-panel-tenancy-ui',
     ];
 

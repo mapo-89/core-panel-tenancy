@@ -68,10 +68,15 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
             ...$this->publishableTree(__DIR__.'/../stubs/database/seeders', database_path('seeders')),
         ], 'core-panel-tenancy-migrations');
 
-        $this->publishes([
-            ...$this->publishableTree(__DIR__.'/../resources/lang', lang_path()),
-            ...$this->publishableTree(__DIR__.'/../resources/lang', $this->app->langPath('vendor/core-panel-tenancy')),
-        ], 'core-panel-tenancy-lang');
+        $this->publishes(
+            $this->publishableTree(__DIR__.'/../resources/lang', lang_path()),
+            'core-panel-tenancy-lang',
+        );
+
+        $this->publishes(
+            $this->publishableTree(__DIR__.'/../resources/lang', $this->app->langPath('vendor/core-panel-tenancy')),
+            'core-panel-tenancy-lang-vendor',
+        );
 
         $this->publishes([
             __DIR__.'/../resources/js/components/Users/UserTenantsTab.vue' => resource_path('js/components/Users/UserTenantsTab.vue'),

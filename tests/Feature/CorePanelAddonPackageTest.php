@@ -110,6 +110,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($installCommand)->toContain('core-panel-tenancy-core')
         ->and($installCommand)->toContain('core-panel-tenancy-config')
         ->and($installCommand)->toContain('core-panel-tenancy-migrations')
+        ->and($installCommand)->toContain('core-panel-tenancy-lang-vendor')
         ->and($installCommand)->toContain('CorePanelPublisher::class')
         ->and($installCommand)->toContain('publishForProvider(')
         ->and($installCommand)->not->toContain("\$this->call('vendor:publish'")
@@ -310,6 +311,16 @@ it('binds the tenant-aware settings logo url generator when the addon is loaded'
 });
 
 it('registers publish tags for the direct stancl addon resources', function (): void {
+    $rootLangPublishes = ServiceProvider::pathsToPublish(
+        CorePanelTenancyServiceProvider::class,
+        'core-panel-tenancy-lang',
+    );
+    $vendorLangPublishes = ServiceProvider::pathsToPublish(
+        CorePanelTenancyServiceProvider::class,
+        'core-panel-tenancy-lang-vendor',
+    );
+    $vendorPublishDestinations = array_values($vendorLangPublishes);
+
     expect(ServiceProvider::pathsToPublish(
         CorePanelTenancyServiceProvider::class,
         'core-panel-tenancy-core',
@@ -322,10 +333,14 @@ it('registers publish tags for the direct stancl addon resources', function (): 
             CorePanelTenancyServiceProvider::class,
             'core-panel-tenancy-migrations',
         ))->not->toBeEmpty()
-        ->and(ServiceProvider::pathsToPublish(
-            CorePanelTenancyServiceProvider::class,
-            'core-panel-tenancy-lang',
-        ))->not->toBeEmpty();
+        ->and($rootLangPublishes)->not->toBeEmpty()
+        ->and($vendorLangPublishes)->not->toBeEmpty()
+        ->and(collect($vendorPublishDestinations)->contains(
+            static fn (string $path): bool => str_ends_with($path, '/lang/vendor/core-panel-tenancy/en/page-tenants.php'),
+        ))->toBeTrue()
+        ->and(collect($vendorPublishDestinations)->contains(
+            static fn (string $path): bool => str_ends_with($path, '/lang/vendor/core-panel-tenancy/de/page-tenants.php'),
+        ))->toBeTrue();
 });
 
 it('normalizes generated wayfinder route urls back to relative paths for central-domain routes', function (): void {
