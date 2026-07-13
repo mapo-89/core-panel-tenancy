@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy\Http\Requests;
 
-use App\Models\User;
 use CorePanelTenancy\Support\TenantModelResolver;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +15,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 
 final class UpdateTenantRequest extends FormRequest
 {
@@ -96,7 +96,7 @@ final class UpdateTenantRequest extends FormRequest
     }
 
     /**
-     * @return Collection<int, string>
+     * @return Collection<int, lowercase-string&non-empty-string>
      */
     public function domains(): Collection
     {
@@ -105,11 +105,19 @@ final class UpdateTenantRequest extends FormRequest
             $this->string('additional_domains')->toString(),
         ])->implode("\n");
 
-        return collect(preg_split('/[\s,;]+/', $allDomains) ?: [])
-            ->map(static fn (string $domain): string => Str::lower(trim($domain)))
-            ->filter()
-            ->unique()
-            ->values();
+        $domains = [];
+
+        foreach (preg_split('/[\s,;]+/', $allDomains) ?: [] as $domain) {
+            $normalizedDomain = Str::lower(trim($domain));
+
+            if ($normalizedDomain === '' || in_array($normalizedDomain, $domains, true)) {
+                continue;
+            }
+
+            $domains[] = $normalizedDomain;
+        }
+
+        return collect(array_map(static fn (string $domain): string => $domain, $domains));
     }
 
     /**
@@ -152,7 +160,10 @@ final class UpdateTenantRequest extends FormRequest
         ])->contains(fn (string $field): bool => $this->filled($field));
     }
 
-    private function tenant(): ?object
+    /**
+     * @return (Model&TenantContract)|null
+     */
+    private function tenant(): ?Model
     {
         $tenantId = $this->route('tenant');
 
@@ -161,8 +172,9 @@ final class UpdateTenantRequest extends FormRequest
         }
 
         $tenantModel = app(TenantModelResolver::class)->tenantModelClass();
+        $tenant = $tenantModel::query()->find((string) $tenantId);
 
-        return $tenantModel::query()->find((string) $tenantId);
+        return $tenant instanceof TenantContract ? $tenant : null;
     }
 
     private function superAdminRequiredRule(): object
@@ -208,7 +220,7 @@ final class UpdateTenantRequest extends FormRequest
                 return false;
             }
 
-            $userModel = $this->userModelClass();
+            $userModel = app(TenantModelResolver::class)->userModelClass();
 
             return $userModel::query()
                 ->where('email', Str::lower($this->string('super_admin_email')->trim()->toString()))
@@ -226,13 +238,13 @@ final class UpdateTenantRequest extends FormRequest
 
     private function resolveCurrentSuperAdminUserIdInTenantContext(Model $tenant): ?string
     {
-        $userModel = $this->userModelClass();
+        $userModel = app(TenantModelResolver::class)->userModelClass();
         $superAdminUserId = $tenant->getAttribute('super_admin_user_id');
 
         if (is_string($superAdminUserId) && $superAdminUserId !== '') {
             $existingUser = $userModel::query()->find($superAdminUserId);
 
-            if ($existingUser instanceof Authenticatable) {
+            if ($existingUser instanceof Model && $existingUser instanceof Authenticatable) {
                 return (string) $existingUser->getAuthIdentifier();
             }
         }
@@ -242,7 +254,7 @@ final class UpdateTenantRequest extends FormRequest
         if (is_string($superAdminEmail) && $superAdminEmail !== '') {
             $existingUser = $userModel::query()->where('email', $superAdminEmail)->first();
 
-            if ($existingUser instanceof Authenticatable) {
+            if ($existingUser instanceof Model && $existingUser instanceof Authenticatable) {
                 return (string) $existingUser->getAuthIdentifier();
             }
         }
@@ -250,29 +262,11 @@ final class UpdateTenantRequest extends FormRequest
         if (method_exists($userModel, 'role')) {
             $fallbackUser = $userModel::role('super-admin')->orderBy('created_at')->first();
 
-            if ($fallbackUser instanceof Authenticatable) {
+            if ($fallbackUser instanceof Model && $fallbackUser instanceof Authenticatable) {
                 return (string) $fallbackUser->getAuthIdentifier();
             }
         }
 
         return null;
-    }
-
-    /**
-     * @return class-string<Model&Authenticatable>
-     */
-    private function userModelClass(): string
-    {
-        /** @var class-string<Model&Authenticatable>|null $modelClass */
-        $modelClass = config('core-panel.user_model');
-
-        if (is_string($modelClass) && $modelClass !== '' && class_exists($modelClass)) {
-            return $modelClass;
-        }
-
-        /** @var class-string<Model&Authenticatable> $fallback */
-        $fallback = User::class;
-
-        return $fallback;
     }
 }

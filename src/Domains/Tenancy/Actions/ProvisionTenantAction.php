@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 
 final readonly class ProvisionTenantAction
 {
@@ -18,16 +19,15 @@ final readonly class ProvisionTenantAction
      * @param  list<string>  $domains
      * @param  array<string, mixed>  $data
      */
-    public function execute(array $domains, ?string $tenantId = null, ?string $databaseName = null, array $data = []): Model
+    public function execute(array $domains, ?string $tenantId = null, ?string $databaseName = null, array $data = []): Model&TenantContract
     {
         $normalizedDomains = $this->normalizeDomains($domains);
         $resolvedTenantId = $this->resolveTenantId($tenantId, (string) $normalizedDomains->first());
         $this->ensureTenantIdIsAvailable($resolvedTenantId);
         $this->ensureDomainsAreAvailable($normalizedDomains);
 
-        $tenantModel = $this->models->tenantModelClass();
-        /** @var Model $tenant */
         $tenantAttributes = ['id' => $resolvedTenantId, ...$data];
+        $tenantModel = $this->models->tenantModelClass();
         $resolvedDatabaseName = is_string($databaseName) ? trim($databaseName) : null;
 
         if ($resolvedDatabaseName !== null && $resolvedDatabaseName !== '') {
@@ -35,33 +35,62 @@ final readonly class ProvisionTenantAction
         }
 
         $tenant = $tenantModel::query()->create($tenantAttributes);
+        $domainModel = $this->models->domainModelClass();
+        $tenant = $this->requireTenantContract($tenant);
 
-        $tenant->domains()->createMany(
-            $normalizedDomains
-                ->map(static fn (string $domain): array => ['domain' => $domain])
-                ->all(),
+        foreach ($normalizedDomains as $domain) {
+            $domainModel::query()->create([
+                'tenant_id' => (string) $tenant->getKey(),
+                'domain' => $domain,
+            ]);
+        }
+
+        $tenant->setRelation(
+            'domains',
+            $domainModel::query()
+                ->where('tenant_id', (string) $tenant->getKey())
+                ->orderBy('id')
+                ->get(),
         );
 
-        return $tenant->fresh('domains');
+        return $tenant;
     }
 
     /**
      * @param  list<string>  $domains
-     * @return Collection<int, string>
+     * @return Collection<int, lowercase-string&non-empty-string>
      */
     private function normalizeDomains(array $domains): Collection
     {
-        $normalizedDomains = collect($domains)
-            ->map(static fn (string $domain): string => Str::lower(trim($domain)))
-            ->filter()
-            ->unique()
-            ->values();
+        $normalizedDomains = [];
 
-        if ($normalizedDomains->isEmpty()) {
+        foreach ($domains as $domain) {
+            $normalizedDomain = Str::lower(trim($domain));
+
+            if ($normalizedDomain === '' || in_array($normalizedDomain, $normalizedDomains, true)) {
+                continue;
+            }
+
+            $normalizedDomains[] = $normalizedDomain;
+        }
+
+        if ($normalizedDomains === []) {
             throw new InvalidArgumentException('At least one tenant domain is required.');
         }
 
-        return $normalizedDomains;
+        return collect(array_map(static fn (string $domain): string => $domain, $normalizedDomains));
+    }
+
+    /**
+     * @return Model&TenantContract
+     */
+    private function requireTenantContract(Model $tenant): Model
+    {
+        if (! $tenant instanceof TenantContract) {
+            throw new InvalidArgumentException('Configured tenant model must implement the tenancy tenant contract.');
+        }
+
+        return $tenant;
     }
 
     private function resolveTenantId(?string $tenantId, string $primaryDomain): string
@@ -89,7 +118,7 @@ final readonly class ProvisionTenantAction
     }
 
     /**
-     * @param  Collection<int, string>  $domains
+     * @param  Collection<int, lowercase-string&non-empty-string>  $domains
      */
     private function ensureDomainsAreAvailable(Collection $domains): void
     {

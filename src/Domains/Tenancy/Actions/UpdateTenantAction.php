@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 
 final class UpdateTenantAction
 {
@@ -18,42 +19,59 @@ final class UpdateTenantAction
      * @param  list<string>  $domains
      * @param  array<string, mixed>  $data
      */
-    public function execute(Model $tenant, array $domains, array $data = []): Model
+    public function execute(Model $tenant, array $domains, array $data = []): Model&TenantContract
     {
         $normalizedDomains = $this->normalizeDomains($domains);
+        $tenant = $this->requireTenantContract($tenant);
         $this->ensureDomainsAreAvailable($tenant, $normalizedDomains);
+        $domainModel = $this->models->domainModelClass();
 
         if ($data !== []) {
             $tenant->update($data);
         }
 
-        $currentDomains = collect($tenant->domains()->pluck('domain'));
+        $currentDomains = $domainModel::query()
+            ->where('tenant_id', (string) $tenant->getKey())
+            ->pluck('domain');
         $domainsToAdd = $normalizedDomains->diff($currentDomains);
         $domainsToRemove = $currentDomains->diff($normalizedDomains);
 
         if ($domainsToRemove->isNotEmpty()) {
-            $domainModel = $this->models->domainModelClass();
             $domainModel::query()
+                ->where('tenant_id', (string) $tenant->getKey())
                 ->whereIn('domain', $domainsToRemove->all())
                 ->delete();
         }
 
         if ($domainsToAdd->isNotEmpty()) {
-            $tenant->domains()->createMany(
-                $domainsToAdd->map(static fn (string $domain): array => ['domain' => $domain])->all(),
-            );
+            foreach ($domainsToAdd as $domain) {
+                $domainModel::query()->create([
+                    'tenant_id' => (string) $tenant->getKey(),
+                    'domain' => $domain,
+                ]);
+            }
         }
 
-        return $tenant->fresh('domains');
+        $tenant->setRelation(
+            'domains',
+            $domainModel::query()
+                ->where('tenant_id', (string) $tenant->getKey())
+                ->orderBy('id')
+                ->get(),
+        );
+
+        return $tenant;
     }
 
     /**
-     * @param  Collection<int, string>  $domains
+     * @param  Collection<int, lowercase-string&non-empty-string>  $domains
      */
     private function ensureDomainsAreAvailable(Model $tenant, Collection $domains): void
     {
-        $currentDomains = collect($tenant->domains()->pluck('domain'));
         $domainModel = $this->models->domainModelClass();
+        $currentDomains = $domainModel::query()
+            ->where('tenant_id', (string) $tenant->getKey())
+            ->pluck('domain');
         $existingDomains = $domainModel::query()
             ->whereIn('domain', $domains->all())
             ->whereNotIn('domain', $currentDomains->all())
@@ -68,20 +86,38 @@ final class UpdateTenantAction
 
     /**
      * @param  list<string>  $domains
-     * @return Collection<int, string>
+     * @return Collection<int, lowercase-string&non-empty-string>
      */
     private function normalizeDomains(array $domains): Collection
     {
-        $normalizedDomains = collect($domains)
-            ->map(static fn (string $domain): string => Str::lower(trim($domain)))
-            ->filter()
-            ->unique()
-            ->values();
+        $normalizedDomains = [];
 
-        if ($normalizedDomains->isEmpty()) {
+        foreach ($domains as $domain) {
+            $normalizedDomain = Str::lower(trim($domain));
+
+            if ($normalizedDomain === '' || in_array($normalizedDomain, $normalizedDomains, true)) {
+                continue;
+            }
+
+            $normalizedDomains[] = $normalizedDomain;
+        }
+
+        if ($normalizedDomains === []) {
             throw new InvalidArgumentException('At least one tenant domain is required.');
         }
 
-        return $normalizedDomains;
+        return collect(array_map(static fn (string $domain): string => $domain, $normalizedDomains));
+    }
+
+    /**
+     * @return Model&TenantContract
+     */
+    private function requireTenantContract(Model $tenant): Model
+    {
+        if (! $tenant instanceof TenantContract) {
+            throw new InvalidArgumentException('Configured tenant model must implement the tenancy tenant contract.');
+        }
+
+        return $tenant;
     }
 }

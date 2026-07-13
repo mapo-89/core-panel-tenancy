@@ -10,6 +10,20 @@ use Illuminate\Support\Collection;
 
 final class TenantResource extends JsonResource
 {
+    /**
+     * @return array{
+     *     id:string,
+     *     primary_domain:string,
+     *     domains:list<string>,
+     *     domains_count:int,
+     *     database_name:string,
+     *     name:?string,
+     *     plan:?string,
+     *     status:string,
+     *     super_admin:array{email:?string,first_name:?string,full_name:?string,id:?string,last_name:?string,mobile:?string}|null,
+     *     created_at:?string
+     * }
+     */
     public function toArray(Request $request): array
     {
         $tenant = $this->resource;

@@ -127,12 +127,12 @@ final class SettingsController extends Controller
                         ->map(function (array $field, string $key) use ($storedValues): array {
                             return [
                                 'help' => $field['help'] ?? null,
-                                'isLocalized' => (bool) ($field['is_localized'] ?? false),
-                                'isPublic' => (bool) ($field['is_public'] ?? false),
+                                'isLocalized' => $field['is_localized'],
+                                'isPublic' => $field['is_public'],
                                 'key' => $key,
                                 'label' => (string) $field['label'],
-                                'options' => array_values((array) ($field['options'] ?? [])),
-                                'type' => (string) ($field['type'] ?? 'text'),
+                                'options' => $field['options'] ?? [],
+                                'type' => $field['type'],
                                 'value' => $storedValues[$key] ?? $field['default'] ?? null,
                             ];
                         })
@@ -201,9 +201,9 @@ final class SettingsController extends Controller
             }
 
             $payload[$key] = [
-                'is_localized' => (bool) ($field['is_localized'] ?? false),
-                'is_public' => (bool) ($field['is_public'] ?? false),
-                'type' => (string) ($field['type'] ?? 'string'),
+                'is_localized' => $field['is_localized'],
+                'is_public' => $field['is_public'],
+                'type' => $field['type'],
                 'value' => $value,
             ];
         }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy\Domains\Tenancy\Actions;
 
-use App\Models\User;
+use CorePanelTenancy\Support\TenantModelResolver;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -13,15 +13,22 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
+use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 
 final class UpsertTenantSuperAdminAction
 {
+    public function __construct(private readonly TenantModelResolver $models) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
     public function execute(Model $tenant, array $data): ?Authenticatable
     {
-        $userModel = $this->userModelClass();
+        if (! $tenant instanceof TenantContract) {
+            return null;
+        }
+
+        $userModel = $this->models->userModelClass();
 
         try {
             tenancy()->initialize($tenant);
@@ -88,14 +95,14 @@ final class UpsertTenantSuperAdminAction
      * @param  class-string<Model&Authenticatable>  $userModel
      * @return (Model&Authenticatable)|null
      */
-    private function resolveExistingTenantSuperAdmin(Model $tenant, array $data, string $userModel): ?Authenticatable
+    private function resolveExistingTenantSuperAdmin(Model $tenant, array $data, string $userModel): ?Model
     {
         $superAdminUserId = $tenant->getAttribute('super_admin_user_id');
 
         if (is_string($superAdminUserId) && $superAdminUserId !== '') {
             $existingUser = $userModel::query()->find($superAdminUserId);
 
-            if ($existingUser instanceof Authenticatable) {
+            if ($existingUser instanceof Model && $existingUser instanceof Authenticatable) {
                 return $existingUser;
             }
         }
@@ -105,7 +112,7 @@ final class UpsertTenantSuperAdminAction
         if (is_string($email) && $email !== '') {
             $existingUser = $userModel::query()->where('email', $email)->first();
 
-            if ($existingUser instanceof Authenticatable) {
+            if ($existingUser instanceof Model && $existingUser instanceof Authenticatable) {
                 return $existingUser;
             }
         }
@@ -113,29 +120,11 @@ final class UpsertTenantSuperAdminAction
         if (method_exists($userModel, 'role')) {
             $fallbackUser = $userModel::role('super-admin')->orderBy('created_at')->first();
 
-            if ($fallbackUser instanceof Authenticatable) {
+            if ($fallbackUser instanceof Model && $fallbackUser instanceof Authenticatable) {
                 return $fallbackUser;
             }
         }
 
         return null;
-    }
-
-    /**
-     * @return class-string<Model&Authenticatable>
-     */
-    private function userModelClass(): string
-    {
-        /** @var class-string<Model&Authenticatable>|null $modelClass */
-        $modelClass = config('core-panel.user_model');
-
-        if (is_string($modelClass) && $modelClass !== '' && class_exists($modelClass)) {
-            return $modelClass;
-        }
-
-        /** @var class-string<Model&Authenticatable> $fallback */
-        $fallback = User::class;
-
-        return $fallback;
     }
 }

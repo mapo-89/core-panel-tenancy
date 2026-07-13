@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy\Http\Requests;
 
-use App\Models\User;
 use CorePanelTenancy\Support\TenantModelResolver;
-use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -104,7 +101,7 @@ final class StoreTenantRequest extends FormRequest
     }
 
     /**
-     * @return Collection<int, string>
+     * @return Collection<int, lowercase-string&non-empty-string>
      */
     public function domains(): Collection
     {
@@ -113,11 +110,19 @@ final class StoreTenantRequest extends FormRequest
             $this->string('additional_domains')->toString(),
         ])->implode("\n");
 
-        return collect(preg_split('/[\s,;]+/', $allDomains) ?: [])
-            ->map(static fn (string $domain): string => Str::lower(trim($domain)))
-            ->filter()
-            ->unique()
-            ->values();
+        $domains = [];
+
+        foreach (preg_split('/[\s,;]+/', $allDomains) ?: [] as $domain) {
+            $normalizedDomain = Str::lower(trim($domain));
+
+            if ($normalizedDomain === '' || in_array($normalizedDomain, $domains, true)) {
+                continue;
+            }
+
+            $domains[] = $normalizedDomain;
+        }
+
+        return collect(array_map(static fn (string $domain): string => $domain, $domains));
     }
 
     public function resolvedTenantId(): ?string
@@ -176,7 +181,7 @@ final class StoreTenantRequest extends FormRequest
     {
         $primaryDomain = $this->domains()->first();
 
-        if (! is_string($primaryDomain) || $primaryDomain === '') {
+        if (! is_string($primaryDomain)) {
             return null;
         }
 
@@ -199,23 +204,5 @@ final class StoreTenantRequest extends FormRequest
         }
 
         return $primaryDomain;
-    }
-
-    /**
-     * @return class-string<Model&Authenticatable>
-     */
-    private function userModelClass(): string
-    {
-        /** @var class-string<Model&Authenticatable>|null $modelClass */
-        $modelClass = config('core-panel.user_model');
-
-        if (is_string($modelClass) && $modelClass !== '' && class_exists($modelClass)) {
-            return $modelClass;
-        }
-
-        /** @var class-string<Model&Authenticatable> $fallback */
-        $fallback = User::class;
-
-        return $fallback;
     }
 }
