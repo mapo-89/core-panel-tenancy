@@ -69,15 +69,15 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         ], 'core-panel-tenancy-migrations');
 
         $this->publishes([
-            ...$this->publishableTree(__DIR__.'/../stubs/lang', lang_path()),
+            ...$this->publishableTree(__DIR__.'/../resources/lang', lang_path()),
             ...$this->publishableTree(__DIR__.'/../resources/lang', $this->app->langPath('vendor/core-panel-tenancy')),
         ], 'core-panel-tenancy-lang');
 
         $this->publishes([
-            __DIR__.'/../stubs/resources/js/components/Users/UserTenantsTab.vue' => resource_path('js/components/Users/UserTenantsTab.vue'),
-            __DIR__.'/../stubs/resources/js/pages/Admin/Tenants/Edit.vue' => resource_path('js/pages/Admin/Tenants/Edit.vue'),
-            __DIR__.'/../stubs/resources/js/pages/Admin/Tenants/components/TenantForm.vue' => resource_path('js/pages/Admin/Tenants/components/TenantForm.vue'),
-            __DIR__.'/../stubs/resources/js/pages/Admin/Users/Index.vue' => resource_path('js/pages/Admin/Users/Index.vue'),
+            __DIR__.'/../resources/js/components/Users/UserTenantsTab.vue' => resource_path('js/components/Users/UserTenantsTab.vue'),
+            __DIR__.'/../resources/js/pages/Admin/Tenants/Edit.vue' => resource_path('js/pages/Admin/Tenants/Edit.vue'),
+            __DIR__.'/../resources/js/pages/Admin/Tenants/components/TenantForm.vue' => resource_path('js/pages/Admin/Tenants/components/TenantForm.vue'),
+            __DIR__.'/../resources/js/pages/Admin/Users/Index.vue' => resource_path('js/pages/Admin/Users/Index.vue'),
         ], 'core-panel-tenancy-ui');
     }
 

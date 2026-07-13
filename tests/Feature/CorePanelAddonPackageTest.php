@@ -61,13 +61,13 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $universalRouteFile = file_get_contents(__DIR__.'/../../stubs/routes/universal.php');
     $tenantCentralRouteFile = file_get_contents(__DIR__.'/../../routes/web/tenants.php');
     $tenantSettingsRouteFile = file_get_contents(__DIR__.'/../../routes/web/admin/settings.php');
-    $tenantUsersOverride = file_get_contents(__DIR__.'/../../stubs/resources/js/pages/Admin/Users/Index.vue');
-    $tenantEditPage = file_get_contents(__DIR__.'/../../stubs/resources/js/pages/Admin/Tenants/Edit.vue');
-    $tenantTab = file_get_contents(__DIR__.'/../../stubs/resources/js/components/Users/UserTenantsTab.vue');
-    $tenantForm = file_get_contents(__DIR__.'/../../stubs/resources/js/pages/Admin/Tenants/components/TenantForm.vue');
-    $coreAdminTheme = file_get_contents(__DIR__.'/../../../core-panel/stubs/resources/css/theme/_admin.css');
+    $tenantUsersOverride = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Users/Index.vue');
+    $tenantEditPage = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Tenants/Edit.vue');
+    $tenantTab = file_get_contents(__DIR__.'/../../resources/js/components/Users/UserTenantsTab.vue');
+    $tenantForm = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Tenants/components/TenantForm.vue');
+    $coreAdminTheme = file_get_contents(__DIR__.'/../../../core-panel/resources/css/theme/_admin.css');
     $appServiceProviderStub = file_get_contents(__DIR__.'/../../stubs/app/Providers/AppServiceProvider.php');
-    $addonTypesAwareUsersIndex = file_get_contents(__DIR__.'/../../stubs/resources/js/pages/Admin/Users/Index.vue');
+    $addonTypesAwareUsersIndex = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Users/Index.vue');
     $tenancyServiceProviderStub = file_get_contents(__DIR__.'/../../stubs/app/Providers/TenancyServiceProvider.php');
     $appServiceProviderTenancyMerger = file_get_contents(__DIR__.'/../../src/Support/Install/AppServiceProviderTenancyMerger.php');
     $corePanelTypesTenancyMerger = file_get_contents(__DIR__.'/../../src/Support/Install/CorePanelTypesTenancyMerger.php');
@@ -89,8 +89,10 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $tenantAwareUrlGenerator = file_get_contents(__DIR__.'/../../src/Support/Media/TenantAwareUrlGenerator.php');
     $tenantDatabaseSeeder = file_get_contents(__DIR__.'/../../stubs/database/seeders/Tenant/TenantDatabaseSeeder.php');
     $tenantRolePermissionSeeder = file_get_contents(__DIR__.'/../../stubs/database/seeders/Tenant/TenantRolePermissionSeeder.php');
-    $tenantGermanTranslations = file_get_contents(__DIR__.'/../../stubs/lang/de/page-tenants.php');
-    $tenantEnglishTranslations = file_get_contents(__DIR__.'/../../stubs/lang/en/page-tenants.php');
+    $tenantGermanTranslations = file_get_contents(__DIR__.'/../../resources/lang/de/page-tenants.php');
+    $tenantEnglishTranslations = file_get_contents(__DIR__.'/../../resources/lang/en/page-tenants.php');
+    $tenantGermanTenancyTranslations = file_get_contents(__DIR__.'/../../resources/lang/de/tenancy.php');
+    $tenantEnglishTenancyTranslations = file_get_contents(__DIR__.'/../../resources/lang/en/tenancy.php');
     $upsertTenantSuperAdminAction = file_get_contents(__DIR__.'/../../src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php');
     $tenantSettingsController = file_get_contents(__DIR__.'/../../src/Http/Controllers/SettingsController.php');
 
@@ -144,9 +146,9 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($provider)->not->toContain('stubs/app/Providers/AppServiceProvider.php')
         ->and($provider)->toContain("publishableMigrationsTree(__DIR__.'/../stubs/database/migrations', database_path('migrations'))")
         ->and($provider)->toContain("publishableTree(__DIR__.'/../stubs/database/seeders', database_path('seeders'))")
-        ->and($provider)->toContain("publishableTree(__DIR__.'/../stubs/lang', lang_path())")
+        ->and($provider)->toContain("publishableTree(__DIR__.'/../resources/lang', lang_path())")
         ->and($provider)->toContain("publishableTree(__DIR__.'/../resources/lang', \$this->app->langPath('vendor/core-panel-tenancy'))")
-        ->and($provider)->toContain("stubs/resources/js/pages/Admin/Users/Index.vue' => resource_path('js/pages/Admin/Users/Index.vue')")
+        ->and($provider)->toContain("resources/js/pages/Admin/Users/Index.vue' => resource_path('js/pages/Admin/Users/Index.vue')")
         ->and($tenantUsersOverride)->toContain('resyncManagedRoles')
         ->and($tenantUsersOverride)->toContain("'assignableRoles'")
         ->and($tenantUsersOverride)->toContain("'canAssignRoles'")
@@ -213,10 +215,10 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantForm)->toContain(':min-length="8"')
         ->and($tenantForm)->toContain(':match-password="form.super_admin_password"')
         ->and($tenantForm)->not->toContain('const showPasswordRequirements = computed(() => {')
-        ->and($tenantGermanTranslations)->toContain("'assigned_domains' =>")
         ->and($tenantGermanTranslations)->toContain("'super_admin_password_hint' =>")
-        ->and($tenantEnglishTranslations)->toContain("'assigned_domains' =>")
+        ->and($tenantGermanTenancyTranslations)->toContain("'assigned_domains' =>")
         ->and($tenantEnglishTranslations)->toContain("'super_admin_password_hint' =>")
+        ->and($tenantEnglishTenancyTranslations)->toContain("'assigned_domains' =>")
         ->and($sessionCookieMiddleware)->toContain("\$cookieName = \$defaultCookie.'_'.\$suffix;")
         ->and($sessionCookieMiddleware)->toContain("config()->set('session.cookie_base', \$defaultCookie);")
         ->and($sessionCookieMiddleware)->toContain("config()->set('session.cookie', \$cookieName);")
@@ -412,7 +414,7 @@ it('limits tenancy update dry-runs to tenancy provider tags', function (): void 
 it('adopts legacy tenancy publishes into the manifest during force updates', function (): void {
     $basePath = makeTenancyUpdateBasePath('legacy-adopt');
     $target = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
-    $source = __DIR__.'/../../stubs/resources/js/pages/Admin/Users/Index.vue';
+    $source = __DIR__.'/../../resources/js/pages/Admin/Users/Index.vue';
 
     mkdir(dirname($target), 0777, true);
     file_put_contents($target, "<template>\n    <div>legacy tenancy users</div>\n</template>\n");
@@ -436,7 +438,7 @@ it('adopts legacy tenancy publishes into the manifest during force updates', fun
 it('leaves core vendor-first assets unmanaged when updating tenancy user overrides directly', function (): void {
     $basePath = makeTenancyUpdateBasePath('core-types-sync');
     $tenantUsersTarget = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
-    $tenantUsersSource = __DIR__.'/../../stubs/resources/js/pages/Admin/Users/Index.vue';
+    $tenantUsersSource = __DIR__.'/../../resources/js/pages/Admin/Users/Index.vue';
     $coreDataTableTarget = $basePath.'/resources/js/components/TableBuilder/DataTable.vue';
     $coreUseDataTableTarget = $basePath.'/resources/js/components/TableBuilder/useDataTable.ts';
     $coreTypesTarget = $basePath.'/resources/js/types/core-panel.ts';
