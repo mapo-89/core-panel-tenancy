@@ -5,7 +5,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.5",
-        "mapo-89/core-panel": "^1.2 || dev-main",
+        "mapo-89/core-panel": "^1.3 || dev-main",
         "stancl/tenancy": "^3.9"
     },
     "require-dev": {
@@ -45,5 +45,5 @@
             }
         }
     ],
-    "version": "1.2.0"
+    "version": "1.3.0"
 }
