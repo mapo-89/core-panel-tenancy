@@ -6,8 +6,11 @@ use CorePanel\Contracts\SettingsLogoUrlGenerator;
 use CorePanelTenancy\Console\InstallTenancyCommand;
 use CorePanelTenancy\Console\UpdateTenancyCommand;
 use CorePanelTenancy\CorePanelTenancyServiceProvider;
+use CorePanelTenancy\Support\Install\HandleInertiaRequestsTenancyMerger;
 use CorePanelTenancy\Support\Media\TenantAwareUrlGenerator;
 use CorePanelTenancy\Support\Settings\TenantAwareSettingsLogoUrlGenerator;
+use CorePanelTenancy\Support\Tenancy\CentralImpersonationContext;
+use CorePanelTenancy\Support\Tenancy\TenantSwitcher;
 use CorePanelTenancy\Support\Wayfinder\WayfinderRouteUrlNormalizer;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\ServiceProvider;
@@ -65,17 +68,26 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $tenantEditPage = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Tenants/Edit.vue');
     $tenantTab = file_get_contents(__DIR__.'/../../resources/js/components/Users/UserTenantsTab.vue');
     $tenantForm = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Tenants/components/TenantForm.vue');
+    $tenantImpersonationController = file_get_contents(__DIR__.'/../../src/Http/Controllers/CentralTenantImpersonationController.php');
+    $tenantAppImpersonationController = file_get_contents(__DIR__.'/../../src/Http/Controllers/TenantImpersonationController.php');
+    $leaveTenantImpersonationController = file_get_contents(__DIR__.'/../../src/Http/Controllers/LeaveTenantImpersonationController.php');
+    $centralImpersonationContext = file_get_contents(__DIR__.'/../../src/Support/Tenancy/CentralImpersonationContext.php');
+    $tenantSwitcher = file_get_contents(__DIR__.'/../../src/Support/Tenancy/TenantSwitcher.php');
     $coreAdminTheme = file_get_contents(__DIR__.'/../../../core-panel/resources/css/theme/_admin.css');
+    $coreSidebar = file_get_contents(__DIR__.'/../../../core-panel/resources/js/layouts/components/AppSidebar.vue');
     $appServiceProviderStub = file_get_contents(__DIR__.'/../../stubs/app/Providers/AppServiceProvider.php');
     $addonTypesAwareUsersIndex = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Users/Index.vue');
     $tenancyServiceProviderStub = file_get_contents(__DIR__.'/../../stubs/app/Providers/TenancyServiceProvider.php');
     $appServiceProviderTenancyMerger = file_get_contents(__DIR__.'/../../src/Support/Install/AppServiceProviderTenancyMerger.php');
     $corePanelTypesTenancyMerger = file_get_contents(__DIR__.'/../../src/Support/Install/CorePanelTypesTenancyMerger.php');
+    $handleInertiaRequestsTenancyMerger = file_get_contents(__DIR__.'/../../src/Support/Install/HandleInertiaRequestsTenancyMerger.php');
     $appServiceProviderTenancyHook = file_get_contents(__DIR__.'/../../stubs/merge/app-service-provider.tenancy-hook.stub');
     $corePanelTenancyContextStub = file_get_contents(__DIR__.'/../../stubs/merge/core-panel-tenancy-context.stub');
     $sessionCookieMiddleware = file_get_contents(__DIR__.'/../../src/Http/Middleware/SetTenantAwareSessionCookie.php');
+    $handleInertiaRequests = file_get_contents(__DIR__.'/../../../core-panel/stubs/app/Http/Middleware/HandleInertiaRequests.php');
     $tenantsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000001_create_tenants_table.php', 'tenancy'));
     $domainsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000020_create_domains_table.php', 'tenancy'));
+    $impersonationTokensMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php', 'tenancy'));
     $tenantUsersMigration = file_get_contents(tenancyMigrationStubPath('0001_01_01_000000_create_users_table.php', 'tenant'));
     $tenantSettingsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000003_create_core_panel_settings_table.php', 'tenant'));
     $tenantUserGroupsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000019_create_user_groups_table.php', 'tenant'));
@@ -116,8 +128,10 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($installCommand)->not->toContain("\$this->call('vendor:publish'")
         ->and($installCommand)->toContain('AppServiceProviderTenancyMerger')
         ->and($installCommand)->toContain('CorePanelTypesTenancyMerger')
+        ->and($installCommand)->toContain('HandleInertiaRequestsTenancyMerger')
         ->and($installCommand)->toContain('appServiceProviderTenancyMerger->merge();')
         ->and($installCommand)->toContain('corePanelTypesTenancyMerger->merge();')
+        ->and($installCommand)->toContain('handleInertiaRequestsTenancyMerger->merge();')
         ->and($installCommand)->toContain("database_path('migrations/2026_01_01_000021_add_data_column_to_existing_tenants_table.php')")
         ->and($installCommand)->toContain("resource_path('js/routes/core-panel/tenants.ts')")
         ->and($installCommand)->toContain("'CENTRAL_DOMAINS' =>")
@@ -132,9 +146,11 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($provider)->toContain('mergeFortifyMiddlewareConfig')
         ->and($provider)->toContain('configureMediaLibraryForTenancy')
         ->and($provider)->toContain('shareTenancyContext')
+        ->and($provider)->toContain('shareNavigation')
         ->and($provider)->toContain('SettingsLogoUrlGenerator::class')
         ->and($provider)->toContain('TenantAwareSettingsLogoUrlGenerator::class')
         ->and($provider)->toContain("Inertia::share('tenancy'")
+        ->and($provider)->toContain("Inertia::share(\n            'navigation.tenant_switcher'")
         ->and($provider)->toContain("config()->set('fortify.middleware', \$fortifyMiddleware);")
         ->and($provider)->toContain("config()->set('media-library.url_generator', TenantAwareUrlGenerator::class);")
         ->and($provider)->toContain('InitializeTenancyByDomain::class')
@@ -147,7 +163,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($provider)->not->toContain('stubs/app/Providers/AppServiceProvider.php')
         ->and($provider)->toContain("publishableMigrationsTree(__DIR__.'/../stubs/database/migrations', database_path('migrations'))")
         ->and($provider)->toContain("publishableTree(__DIR__.'/../stubs/database/seeders', database_path('seeders'))")
-        ->and($provider)->toContain("publishableTree(__DIR__.'/../resources/lang', lang_path())")
+        ->and($provider)->toContain("publishableTree(__DIR__.'/../stubs/lang', lang_path())")
         ->and($provider)->toContain("publishableTree(__DIR__.'/../resources/lang', \$this->app->langPath('vendor/core-panel-tenancy'))")
         ->and($provider)->toContain("resources/js/pages/Admin/Users/Index.vue' => resource_path('js/pages/Admin/Users/Index.vue')")
         ->and($tenantUsersOverride)->toContain('resyncManagedRoles')
@@ -155,6 +171,11 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantUsersOverride)->toContain("'canAssignRoles'")
         ->and($appServiceProviderTenancyMerger)->toContain('stubs/app/Providers/AppServiceProvider.php')
         ->and($appServiceProviderTenancyMerger)->toContain('stubs/merge/app-service-provider.tenancy-hook.stub')
+        ->and($handleInertiaRequestsTenancyMerger)->toContain('app/Http/Middleware/HandleInertiaRequests.php')
+        ->and($handleInertiaRequestsTenancyMerger)->toContain('TenantSwitcher::class')
+        ->and($handleInertiaRequestsTenancyMerger)->toContain("'tenant_switcher' => fn (): ?array =>")
+        ->and($handleInertiaRequestsTenancyMerger)->toContain('app(\\\\CorePanelTenancy\\\\Support\\\\Tenancy\\\\TenantSwitcher::class)->forRequest(\$request)')
+        ->and($handleInertiaRequestsTenancyMerger)->toContain('forRequest(\$request)')
         ->and($appServiceProviderTenancyHook)->toContain('Vite::createAssetPathsUsing(')
         ->and($appServiceProviderTenancyHook)->toContain('CommandFinished $event')
         ->and($corePanelTypesTenancyMerger)->toContain('stubs/merge/core-panel-tenancy-context.stub')
@@ -174,12 +195,25 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantController)->toContain('public function edit(string $tenant): Response')
         ->and($tenantController)->toContain('UpsertTenantSuperAdminAction')
         ->and($tenantController)->toContain("->route('core-panel.users.index', ['tab' => 'tenants'])")
+        ->and($tenantImpersonationController)->toContain('ImpersonationToken::create([')
+        ->and($tenantImpersonationController)->toContain("route('tenant.core-panel.dashboard', absolute: false)")
+        ->and($tenantAppImpersonationController)->toContain('ImpersonationToken::findOrFail($token)')
+        ->and($leaveTenantImpersonationController)->toContain('return Inertia::location($url);')
+        ->and($centralImpersonationContext)->toContain("public const SESSION_KEY = 'tenant_impersonation.central_user_id';")
+        ->and($tenantSwitcher)->toContain('public function forRequest(Request $request): ?array')
+        ->and($tenantSwitcher)->toContain("'tenant.tenants.impersonate'")
+        ->and($tenantSwitcher)->toContain("'tenants.impersonate'")
+        ->and($provider)->not->toContain("'tenant.tenants.impersonate' => 'tenants.update'")
+        ->and($tenantRolePermissionSeeder)->toContain("unset(\$tenantAccess['route_permissions']['tenants.dtApi']);")
+        ->and($tenantRolePermissionSeeder)->toContain("unset(\$tenantAccess['route_permissions']['tenants.index']);")
+        ->and($tenantRolePermissionSeeder)->toContain("unset(\$tenantAccess['route_permissions']['tenants.data']);")
         ->and($storeTenantRequest)->toContain("'database_name' => ['nullable', 'string', 'max:255']")
         ->and($storeTenantRequest)->toContain("'super_admin_password' => ['required', 'confirmed', Password::defaults()]")
         ->and($updateTenantRequest)->toContain('shouldManageTenantSuperAdmin')
         ->and($upsertTenantSuperAdminAction)->toContain("Role::findOrCreate('super-admin', 'web');")
         ->and($tenancyConfig)->toContain("'tenant_model' => Tenant::class")
         ->and($tenancyConfig)->toContain('use CorePanel\Support\Migrations\MigrationPathResolver;')
+        ->and($tenancyConfig)->toContain('UserImpersonation::class')
         ->and($tenancyConfig)->toContain('UniversalRoutes::class')
         ->and($tenancyConfig)->toContain("'asset_helper_tenancy' => false")
         ->and($tenancyConfig)->toContain("'--path' => MigrationPathResolver::tenant()")
@@ -194,15 +228,21 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantEditPage)->toContain("import TenantForm from '@/pages/Admin/Tenants/components/TenantForm.vue'")
         ->and($tenantTab)->toContain('destroy as destroyTenant')
         ->and($tenantTab)->toContain('dtApi as tenantDtApi')
+        ->and($tenantTab)->toContain('impersonate as impersonateTenant')
         ->and($tenantTab)->toContain("from '@/routes/tenants'")
         ->and($tenantTab)->toContain('primary_domain')
         ->and($tenantTab)->toContain('database_name')
         ->and($tenantTab)->toContain("import TableBuilderDataTable from '@core-panel/components/TableBuilder/DataTable.vue'")
         ->and($tenantTab)->toContain('<TableBuilderDataTable')
         ->and($tenantTab)->toContain("mode: 'local'")
+        ->and($tenantTab)->toContain("\$t('page-tenants.impersonate')")
         ->and($tenantTab)->toContain('cp-datatable__action-button')
         ->and($tenantTab)->toContain('surface-class="cp-user-tenants-tab__surface"')
         ->and($coreAdminTheme)->toContain('.cp-datatable__action-button {')
+        ->and($coreSidebar)->toContain('tenantSwitcher')
+        ->and($coreSidebar)->toContain('tenantSwitcherOptions.length > 0')
+        ->and($coreSidebar)->toContain("\$t('common.ui.search')")
+        ->and($handleInertiaRequests)->toContain("'corePanel' => [")
         ->and($tenantForm)->toContain('index as tenantsIndex')
         ->and($tenantForm)->toContain('store as storeTenant')
         ->and($tenantForm)->toContain('update as updateTenant')
@@ -217,8 +257,10 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantForm)->toContain(':match-password="form.super_admin_password"')
         ->and($tenantForm)->not->toContain('const showPasswordRequirements = computed(() => {')
         ->and($tenantGermanTranslations)->toContain("'super_admin_password_hint' =>")
+        ->and($tenantGermanTranslations)->toContain("'impersonate' => 'Impersonalisieren'")
         ->and($tenantGermanTenancyTranslations)->toContain("'assigned_domains' =>")
         ->and($tenantEnglishTranslations)->toContain("'super_admin_password_hint' =>")
+        ->and($tenantEnglishTranslations)->toContain("'impersonate' => 'Impersonate'")
         ->and($tenantEnglishTenancyTranslations)->toContain("'assigned_domains' =>")
         ->and($sessionCookieMiddleware)->toContain("\$cookieName = \$defaultCookie.'_'.\$suffix;")
         ->and($sessionCookieMiddleware)->toContain("config()->set('session.cookie_base', \$defaultCookie);")
@@ -230,11 +272,15 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($centralRouteFile)->toContain("require base_path('routes/universal.php');")
         ->and($centralRouteFile)->toContain("if (file_exists(base_path('routes/web/tenants.php'))) {")
         ->and($centralRouteFile)->toContain("require base_path('routes/web/tenants.php');")
+        ->and($tenantRouteFile)->toContain('TenantImpersonationController::class')
+        ->and($tenantRouteFile)->toContain('LeaveTenantImpersonationController::class')
+        ->and($tenantRouteFile)->toContain("Route::get('/impersonate/{token}', TenantImpersonationController::class)->name('impersonate');")
+        ->and($tenantRouteFile)->toContain("Route::get('/leave-impersonation', LeaveTenantImpersonationController::class)->name('leave-impersonation');")
+        ->and($tenantRouteFile)->toContain("if (file_exists(base_path('routes/web/tenants.php'))) {")
         ->and($tenantRouteFile)->toContain('InitializeTenancyByDomain::class')
         ->and($tenantRouteFile)->toContain('PreventAccessFromCentralDomains::class')
         ->and($tenantRouteFile)->toContain("Route::name('tenant.')->group(function () use")
         ->and($tenantRouteFile)->toContain("foreach (\$webRoutes['public'] as \$publicRouteFile)")
-        ->and($tenantRouteFile)->not->toContain('routes/web/tenants.php')
         ->and($universalRouteFile)->not->toContain("\$loadUniversalWebRouteFile('auth.php');")
         ->and($universalRouteFile)->toContain("\$loadUniversalWebRouteFile('platform.php');")
         ->and($tenantRouteFile)->toContain("require base_path('routes/web/'.\$file);")
@@ -244,6 +290,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantSettingsRouteFile)->toContain("Route::put('/settings/{group}', [SettingsController::class, 'update'])->name('settings.update');")
         ->and($tenantCentralRouteFile)->toContain("Route::get('/tenants/dt', 'dtApi')->name('tenants.dtApi');")
         ->and($tenantCentralRouteFile)->toContain("Route::get('/tenants/{tenant}/edit', 'edit')->name('tenants.edit');")
+        ->and($tenantCentralRouteFile)->toContain("Route::post('/tenants/{tenant}/impersonate', CentralTenantImpersonationController::class)")
         ->and($tenantsMigration)->toContain("\$table->string('id')->primary()")
         ->and($tenantsMigration)->toContain('$table->timestamps();')
         ->and($tenantsMigration)->toContain("\$table->json('data')->nullable()")
@@ -251,6 +298,9 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantsMigration)->not->toContain("\$table->string('tenancy_db_name')->nullable();")
         ->and($domainsMigration)->toContain("\$table->string('domain', 255)->unique()")
         ->and($domainsMigration)->toContain("\$table->string('tenant_id');")
+        ->and($impersonationTokensMigration)->toContain("Schema::create('tenant_user_impersonation_tokens'")
+        ->and($impersonationTokensMigration)->toContain("\$table->string('token', 128)->primary();")
+        ->and($impersonationTokensMigration)->toContain("\$table->foreign('tenant_id')")
         ->and($tenantUsersMigration)->toContain("\$table->uuid('id')->primary();")
         ->and($tenantUsersMigration)->toContain("\$table->string('first_name');")
         ->and($tenantUsersMigration)->toContain("\$table->string('last_name');")
@@ -310,6 +360,13 @@ it('binds the tenant-aware settings logo url generator when the addon is loaded'
         ->toBeInstanceOf(TenantAwareSettingsLogoUrlGenerator::class);
 });
 
+it('registers tenancy impersonation helpers in the service container', function (): void {
+    expect(app(CentralImpersonationContext::class))
+        ->toBeInstanceOf(CentralImpersonationContext::class)
+        ->and(app(TenantSwitcher::class))
+        ->toBeInstanceOf(TenantSwitcher::class);
+});
+
 it('registers publish tags for the direct stancl addon resources', function (): void {
     $rootLangPublishes = ServiceProvider::pathsToPublish(
         CorePanelTenancyServiceProvider::class,
@@ -341,6 +398,44 @@ it('registers publish tags for the direct stancl addon resources', function (): 
         ->and(collect($vendorPublishDestinations)->contains(
             static fn (string $path): bool => str_ends_with($path, '/lang/vendor/core-panel-tenancy/de/page-tenants.php'),
         ))->toBeTrue();
+});
+
+it('injects a fully qualified tenant switcher into existing inertia middleware mergers', function (): void {
+    $basePath = makeTenancyUpdateBasePath('handle-inertia-requests-fqcn');
+    $middlewarePath = $basePath.'/app/Http/Middleware/HandleInertiaRequests.php';
+
+    mkdir(dirname($middlewarePath), 0777, true);
+    file_put_contents($middlewarePath, <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Middleware;
+
+use Illuminate\Http\Request;
+use Inertia\Middleware as InertiaMiddleware;
+
+final class HandleInertiaRequests extends InertiaMiddleware
+{
+    public function share(Request $request): array
+    {
+        return [
+            ...parent::share($request),
+            'locale' => [
+                'current' => app()->currentLocale(),
+            ],
+        ];
+    }
+}
+PHP);
+
+    app(HandleInertiaRequestsTenancyMerger::class)->merge($basePath);
+
+    $contents = file_get_contents($middlewarePath);
+
+    expect($contents)->toBeString()
+        ->and($contents)->toContain("'tenant_switcher' => fn (): ?array => app(\CorePanelTenancy\Support\Tenancy\TenantSwitcher::class)->forRequest(\$request)")
+        ->and($contents)->not->toContain('use CorePanelTenancy\\Support\\Tenancy\\TenantSwitcher;');
 });
 
 it('normalizes generated wayfinder route urls back to relative paths for central-domain routes', function (): void {
@@ -511,13 +606,37 @@ it('reports legacy tenancy publishes as conflicts without force', function (): v
         ->and(file_exists($basePath.'/storage/app/core-panel/published.json'))->toBeTrue();
 });
 
+it('publishes the impersonation token migration during tenancy addon updates when it was not previously published', function (): void {
+    $basePath = makeTenancyUpdateBasePath('missing-impersonation-migration');
+    $target = $basePath.'/database/migrations/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
+    $source = tenancyMigrationStubPath('2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php', 'tenancy');
+
+    mkdir($basePath.'/storage/app/core-panel', 0777, true);
+    file_put_contents($basePath.'/storage/app/core-panel/published.json', json_encode([
+        'files' => [],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $manifest = readTenancyPublishManifest($basePath);
+
+    expect(file_get_contents($target))->toBe(file_get_contents($source))
+        ->and($manifest['files'][$target] ?? null)->toBeArray()
+        ->and($manifest['files'][$target]['tag'] ?? null)->toBe('core-panel-tenancy-migrations');
+});
+
 it('refreshes tenancy publish tags through the addon provider for in-place updates', function (): void {
     $command = file_get_contents(__DIR__.'/../../src/Console/UpdateTenancyCommand.php');
 
     expect($command)->toContain('CorePanelTenancyServiceProvider::class')
         ->and($command)->toContain('adoptUnmanagedExisting: true')
+        ->and($command)->toContain('managedMissingPaths: self::REQUIRED_UPDATE_PATHS')
+        ->and($command)->toContain("'database/migrations/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php'")
         ->and($command)->not->toContain('publishProviderTag(CorePanelTenancyServiceProvider::class, $tag, $force);')
         ->and($command)->toContain('if ($basePath === null) {')
         ->and($command)->toContain('ensureTenancyProviderRegistered($basePath);')
+        ->and($command)->toContain('handleInertiaRequestsTenancyMerger->merge($basePath);')
         ->and($command)->toContain('App\\\\Providers\\\\TenancyServiceProvider::class');
 });

@@ -8,9 +8,10 @@ return [
     ],
 
     'route_permissions' => [
-        'core-panel.tenants.dtApi' => 'tenants.view',
-        'core-panel.tenants.index' => 'tenants.view',
-        'core-panel.tenants.data' => 'tenants.view',
+        'tenants.dtApi' => 'tenants.view',
+        'tenants.impersonate' => 'tenants.update',
+        'tenants.index' => 'tenants.view',
+        'tenants.data' => 'tenants.view',
     ],
 
     'permission_groups' => [

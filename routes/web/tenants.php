@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use CorePanelTenancy\Http\Controllers\CentralTenantImpersonationController;
 use CorePanelTenancy\Http\Controllers\TenantController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/tenants/{tenant}/impersonate', CentralTenantImpersonationController::class)
+    ->name('tenants.impersonate');
 
 Route::controller(TenantController::class)
     ->group(function (): void {

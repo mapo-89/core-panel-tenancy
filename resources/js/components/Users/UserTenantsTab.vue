@@ -12,6 +12,7 @@ import TenantForm from '@/pages/Admin/Tenants/components/TenantForm.vue'
 import {
     destroy as destroyTenant,
     dtApi as tenantDtApi,
+    impersonate as impersonateTenant,
 } from '@/routes/tenants'
 import TableBuilderDataTable from '@core-panel/components/TableBuilder/DataTable.vue'
 import type { DataTableSchema } from '@core-panel/components/TableBuilder/types'
@@ -170,6 +171,16 @@ function confirmDelete(tenant: TenantManagementRecord): void {
     })
 }
 
+function impersonate(tenant: TenantManagementRecord): void {
+    router.post(
+        impersonateTenant.url(tenant.id),
+        {},
+        {
+            preserveScroll: true,
+        },
+    )
+}
+
 async function loadTenants(): Promise<void> {
     loading.value = true
 
@@ -227,7 +238,7 @@ watch(
         <TableBuilderDataTable
             :action-column-width="
                 can('tenants.update') || can('tenants.delete')
-                    ? '8.25rem'
+                    ? '11.5rem'
                     : '0px'
             "
             :loading="loading"
@@ -271,6 +282,18 @@ watch(
 
             <template #row-actions="{ row }">
                 <div class="flex justify-end gap-2">
+                    <Button
+                        v-if="can('tenants.update')"
+                        v-tooltip.top="$t('page-tenants.impersonate')"
+                        :aria-label="$t('page-tenants.impersonate')"
+                        class="cp-datatable__action-button"
+                        outlined
+                        severity="contrast"
+                        size="small"
+                        @click="impersonate(row as TenantManagementRecord)"
+                    >
+                        <AppIcon name="arrow-right" />
+                    </Button>
                     <Button
                         v-if="can('tenants.update')"
                         class="cp-datatable__action-button"

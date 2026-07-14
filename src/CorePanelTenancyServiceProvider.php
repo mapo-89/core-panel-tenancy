@@ -10,6 +10,7 @@ use CorePanelTenancy\Console\UpdateTenancyCommand;
 use CorePanelTenancy\Domains\Tenancy\Policies\TenantPolicy;
 use CorePanelTenancy\Support\Media\TenantAwareUrlGenerator;
 use CorePanelTenancy\Support\Settings\TenantAwareSettingsLogoUrlGenerator;
+use CorePanelTenancy\Support\Tenancy\TenantSwitcher;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +34,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
     {
         $this->ensureUniversalMiddlewareGroup();
         $this->shareTenancyContext();
+        $this->shareNavigation();
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'core-panel-tenancy');
         $tenantModel = config('tenancy.tenant_model');
 
@@ -69,7 +71,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         ], 'core-panel-tenancy-migrations');
 
         $this->publishes(
-            $this->publishableTree(__DIR__.'/../resources/lang', lang_path()),
+            $this->publishableTree(__DIR__.'/../stubs/lang', lang_path()),
             'core-panel-tenancy-lang',
         );
 
@@ -259,6 +261,14 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
             'isCentral' => ! tenancy()->initialized,
             'isTenant' => tenancy()->initialized,
         ]);
+    }
+
+    private function shareNavigation(): void
+    {
+        Inertia::share(
+            'navigation.tenant_switcher',
+            static fn (): ?array => app(TenantSwitcher::class)->forRequest(request()),
+        );
     }
 
     /**

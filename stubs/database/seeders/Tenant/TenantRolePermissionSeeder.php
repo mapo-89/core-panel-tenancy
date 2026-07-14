@@ -16,9 +16,9 @@ final class TenantRolePermissionSeeder extends Seeder
         $tenantAccess = $originalAccess;
 
         unset($tenantAccess['resources']['tenants']);
-        unset($tenantAccess['route_permissions']['core-panel.tenants.dtApi']);
-        unset($tenantAccess['route_permissions']['core-panel.tenants.index']);
-        unset($tenantAccess['route_permissions']['core-panel.tenants.data']);
+        unset($tenantAccess['route_permissions']['tenants.dtApi']);
+        unset($tenantAccess['route_permissions']['tenants.index']);
+        unset($tenantAccess['route_permissions']['tenants.data']);
 
         $tenantAccess['permission_groups'] = $this->filterTenantPermissionGroups(
             (array) ($tenantAccess['permission_groups'] ?? []),

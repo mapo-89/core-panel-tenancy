@@ -8,6 +8,7 @@ use CorePanel\Support\Migrations\HostMigrationRunner;
 use CorePanel\Support\PublishesCorePanelAssets;
 use CorePanel\Support\Publishing\CorePanelPublisher;
 use CorePanelTenancy\CorePanelTenancyServiceProvider;
+use CorePanelTenancy\Support\Install\HandleInertiaRequestsTenancyMerger;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 
@@ -27,6 +28,13 @@ final class UpdateTenancyCommand extends Command
         'core-panel-tenancy-ui',
     ];
 
+    /**
+     * @var list<string>
+     */
+    private const REQUIRED_UPDATE_PATHS = [
+        'database/migrations/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php',
+    ];
+
     protected $signature = 'core-panel:tenancy:update
         {--dry-run : Show planned changes without writing files}
         {--force : Overwrite published files after creating a backup}
@@ -38,6 +46,7 @@ final class UpdateTenancyCommand extends Command
     public function __construct(
         private readonly Filesystem $files,
         private readonly HostMigrationRunner $migrations,
+        private readonly HandleInertiaRequestsTenancyMerger $handleInertiaRequestsTenancyMerger,
     ) {
         parent::__construct();
     }
@@ -57,6 +66,7 @@ final class UpdateTenancyCommand extends Command
             $dryRun,
             $basePath,
             adoptUnmanagedExisting: true,
+            managedMissingPaths: self::REQUIRED_UPDATE_PATHS,
         );
 
         $this->table(
@@ -89,6 +99,7 @@ final class UpdateTenancyCommand extends Command
         }
 
         $this->ensureTenancyProviderRegistered($basePath);
+        $this->handleInertiaRequestsTenancyMerger->merge($basePath);
 
         if ($basePath === null) {
             $this->migrations->run($this);

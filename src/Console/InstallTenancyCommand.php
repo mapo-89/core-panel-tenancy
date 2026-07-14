@@ -10,6 +10,7 @@ use CorePanel\Support\SynchronizesEnvironmentFile;
 use CorePanelTenancy\CorePanelTenancyServiceProvider;
 use CorePanelTenancy\Support\Install\AppServiceProviderTenancyMerger;
 use CorePanelTenancy\Support\Install\CorePanelTypesTenancyMerger;
+use CorePanelTenancy\Support\Install\HandleInertiaRequestsTenancyMerger;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 
@@ -39,6 +40,7 @@ final class InstallTenancyCommand extends Command
         private readonly HostMigrationRunner $migrations,
         private readonly AppServiceProviderTenancyMerger $appServiceProviderTenancyMerger,
         private readonly CorePanelTypesTenancyMerger $corePanelTypesTenancyMerger,
+        private readonly HandleInertiaRequestsTenancyMerger $handleInertiaRequestsTenancyMerger,
     ) {
         parent::__construct();
     }
@@ -70,6 +72,7 @@ final class InstallTenancyCommand extends Command
         $this->ensureTenancyProviderRegistered();
         $this->appServiceProviderTenancyMerger->merge();
         $this->corePanelTypesTenancyMerger->merge();
+        $this->handleInertiaRequestsTenancyMerger->merge();
         $this->synchronizeTenancyEnvironment();
 
         if ((bool) $this->option('migrate')) {
