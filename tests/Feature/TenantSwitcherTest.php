@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use CorePanelTenancy\Http\Middleware\RedirectImpersonatingTenantGuest;
 use CorePanelTenancy\Support\Tenancy\CentralImpersonationContext;
 use CorePanelTenancy\Support\Tenancy\TenantSwitcher;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Database\Models\Tenant;
 
 final class ConfiguredCorePanelUser extends Authenticatable
@@ -106,4 +108,33 @@ it('resolves the configured core panel user model before the auth provider model
     expect(app(CentralImpersonationContext::class)->centralUser($request))
         ->toBeInstanceOf(ConfiguredCorePanelUser::class)
         ->getAuthIdentifier()->toBe($user->getAuthIdentifier());
+});
+
+it('redirects impersonating tenant guests to leave impersonation instead of the tenant login', function (): void {
+    $this->migrateScaffoldDatabase();
+
+    config()->set('core-panel.user_model', ConfiguredCorePanelUser::class);
+    config()->set('auth.providers.users.model', stdClass::class);
+    config()->set('tenancy.database.central_connection', 'sqlite');
+
+    $user = ConfiguredCorePanelUser::query()->create([
+        'id' => 'central-user-id',
+        'email' => 'central@example.test',
+        'first_name' => 'Central',
+        'last_name' => 'Admin',
+        'password' => bcrypt('password'),
+    ]);
+
+    Route::middleware(['web', RedirectImpersonatingTenantGuest::class])
+        ->name('tenant.')
+        ->group(function (): void {
+            Route::get('/tenant/dashboard', static fn (): string => 'tenant-dashboard')->name('dashboard');
+            Route::get('/tenant/leave-impersonation', static fn (): string => 'leave')->name('leave-impersonation');
+        });
+
+    $response = $this->withSession([
+        CentralImpersonationContext::SESSION_KEY => $user->getAuthIdentifier(),
+    ])->get('/tenant/dashboard');
+
+    $response->assertRedirect(route('tenant.leave-impersonation'));
 });
