@@ -25,8 +25,28 @@ $tenantWebMiddleware = [
     PreventAccessFromCentralDomains::class,
 ];
 $webRoutes = require base_path('routes/web/routes.php');
-$loadTenantWebRouteFile = static function (string $file): void {
-    require base_path('routes/web/'.$file);
+$packageWebRoutesRoot = base_path('vendor/mapo-89/core-panel/routes/web');
+$loadTenantWebRouteFile = static function (string $file) use ($packageWebRoutesRoot): void {
+    $hostRoutePath = base_path('routes/web/'.$file);
+
+    if (is_file($hostRoutePath)) {
+        require $hostRoutePath;
+
+        return;
+    }
+
+    $packageRoutePath = $packageWebRoutesRoot.'/'.$file;
+
+    if (is_file($packageRoutePath)) {
+        require $packageRoutePath;
+
+        return;
+    }
+
+    throw new RuntimeException(sprintf(
+        'Unable to locate CorePanel tenant web route fragment [%s].',
+        $file,
+    ));
 };
 $corePanelRouteMiddleware = array_values(array_filter(
     (array) config('core-panel.middleware', ['web', 'auth']),
