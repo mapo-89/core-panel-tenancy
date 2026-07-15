@@ -524,6 +524,42 @@ it('limits tenancy update dry-runs to tenancy provider tags', function (): void 
         ->and($output)->not->toContain('core-panel-views');
 });
 
+it('does not create published snapshots during tenancy update dry-runs for legacy manifest entries', function (): void {
+    $basePath = makeTenancyUpdateBasePath('dry-run-legacy-snapshot');
+    $relativePath = 'resources/js/pages/Admin/Users/Index.vue';
+    $target = $basePath.'/'.$relativePath;
+    $source = __DIR__.'/../../resources/js/pages/Admin/Users/Index.vue';
+    $contents = (string) file_get_contents($source);
+    $hash = md5($contents);
+    $manifestPath = $basePath.'/storage/app/core-panel/published.json';
+
+    mkdir(dirname($target), 0777, true);
+    mkdir(dirname($manifestPath), 0777, true);
+
+    file_put_contents($target, $contents);
+    file_put_contents($manifestPath, json_encode([
+        'files' => [
+            $target => [
+                'tag' => 'core-panel-tenancy-ui',
+                'source' => $source,
+                'source_hash' => $hash,
+                'destination_hash' => $hash,
+                'published_at' => now()->subDay()->toAtomString(),
+            ],
+        ],
+    ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)."\n");
+
+    $beforeManifest = (string) file_get_contents($manifestPath);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--dry-run' => true,
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    expect((string) file_get_contents($manifestPath))->toBe($beforeManifest)
+        ->and(file_exists($basePath.'/storage/app/core-panel/published'))->toBeFalse();
+});
+
 it('adopts legacy tenancy publishes into the manifest during force updates', function (): void {
     $basePath = makeTenancyUpdateBasePath('legacy-adopt');
     $target = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
