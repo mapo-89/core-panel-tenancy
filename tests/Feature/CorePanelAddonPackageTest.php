@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use CorePanel\Contracts\SettingsLogoUrlGenerator;
+use CorePanel\Support\Publishing\CorePanelPublisher;
 use CorePanelTenancy\Console\InstallTenancyCommand;
 use CorePanelTenancy\Console\UpdateTenancyCommand;
 use CorePanelTenancy\CorePanelTenancyServiceProvider;
@@ -547,6 +548,57 @@ it('adopts legacy tenancy publishes into the manifest during force updates', fun
         ->and(file_get_contents($backups[0]))->toContain('legacy tenancy users');
 });
 
+it('merges upstream changes into managed tenancy publishes with local modifications during updates', function (): void {
+    $basePath = makeTenancyUpdateBasePath('managed-published-merge');
+    $sourcePath = __DIR__.'/../../resources/js/pages/Admin/Users/Index.vue';
+    $originalSourceContents = (string) file_get_contents($sourcePath);
+
+    try {
+        app(CorePanelPublisher::class)->publishForProvider(
+            CorePanelTenancyServiceProvider::class,
+            ['core-panel-tenancy-ui'],
+            false,
+            false,
+            $basePath,
+        );
+
+        $target = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
+        $targetContents = (string) file_get_contents($target);
+
+        file_put_contents(
+            $target,
+            str_replace(
+                "import UserTenantsTab from '@/components/Users/UserTenantsTab.vue'\n",
+                "import UserTenantsTab from '@/components/Users/UserTenantsTab.vue'\nconst localHostCustomization = true\n",
+                $targetContents,
+            ),
+        );
+
+        file_put_contents(
+            $sourcePath,
+            str_replace(
+                "const canManageTenants = computed(() => page.props.tenancy?.isCentral === true)\n",
+                "const canManageTenants = computed(() => page.props.tenancy?.isCentral === true)\nconst upstreamPackageChange = true\n",
+                $originalSourceContents,
+            ),
+        );
+
+        $this->artisan('core-panel:tenancy:update', [
+            '--base-path' => $basePath,
+        ])->assertExitCode(0);
+
+        $updatedTargetContents = (string) file_get_contents($target);
+        $manifest = readTenancyPublishManifest($basePath);
+
+        expect($updatedTargetContents)
+            ->toContain('const localHostCustomization = true')
+            ->and($updatedTargetContents)->toContain('const upstreamPackageChange = true')
+            ->and($manifest['files'][$target]['snapshot'] ?? null)->toBeString();
+    } finally {
+        file_put_contents($sourcePath, $originalSourceContents);
+    }
+});
+
 it('leaves core vendor-first assets unmanaged when updating tenancy user overrides directly', function (): void {
     $basePath = makeTenancyUpdateBasePath('core-types-sync');
     $tenantUsersTarget = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
@@ -610,7 +662,7 @@ it('reports legacy tenancy publishes as conflicts without force', function (): v
 
 it('publishes the impersonation token migration during tenancy addon updates when it was not previously published', function (): void {
     $basePath = makeTenancyUpdateBasePath('missing-impersonation-migration');
-    $target = $basePath.'/database/migrations/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
+    $target = $basePath.'/database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
     $source = tenancyMigrationStubPath('2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php', 'tenancy');
 
     mkdir($basePath.'/storage/app/core-panel', 0777, true);
@@ -629,13 +681,62 @@ it('publishes the impersonation token migration during tenancy addon updates whe
         ->and($manifest['files'][$target]['tag'] ?? null)->toBe('core-panel-tenancy-migrations');
 });
 
+it('does not duplicate the impersonation token migration when the basename already exists in tenancy migrations', function (): void {
+    $basePath = makeTenancyUpdateBasePath('existing-impersonation-migration-basename');
+    $target = $basePath.'/database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
+    $existingTenancyMigration = $basePath.'/database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
+    $source = tenancyMigrationStubPath('2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php', 'tenancy');
+
+    mkdir(dirname($existingTenancyMigration), 0777, true);
+    mkdir($basePath.'/storage/app/core-panel', 0777, true);
+    file_put_contents($existingTenancyMigration, (string) file_get_contents($source));
+    file_put_contents($basePath.'/storage/app/core-panel/published.json', json_encode([
+        'files' => [],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $manifest = readTenancyPublishManifest($basePath);
+
+    expect(file_exists($target))->toBeTrue()
+        ->and(file_get_contents($target))->toBe(file_get_contents($source))
+        ->and($manifest['files'][$target] ?? null)->toBeArray()
+        ->and($manifest['files'][$target]['tag'] ?? null)->toBe('core-panel-tenancy-migrations');
+});
+
+it('does not recreate removed tenancy translation overrides during updates', function (): void {
+    $basePath = makeTenancyUpdateBasePath('removed-tenancy-translation-override');
+    $target = $basePath.'/lang/vendor/core-panel-tenancy/de/page-tenants.php';
+
+    app(CorePanelPublisher::class)->publishForProvider(
+        CorePanelTenancyServiceProvider::class,
+        ['core-panel-tenancy-lang-vendor'],
+        false,
+        false,
+        $basePath,
+    );
+
+    unlink($target);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $manifest = readTenancyPublishManifest($basePath);
+
+    expect(file_exists($target))->toBeFalse()
+        ->and($manifest['files'][$target] ?? null)->toBeArray();
+});
+
 it('refreshes tenancy publish tags through the addon provider for in-place updates', function (): void {
     $command = file_get_contents(__DIR__.'/../../src/Console/UpdateTenancyCommand.php');
 
     expect($command)->toContain('CorePanelTenancyServiceProvider::class')
         ->and($command)->toContain('adoptUnmanagedExisting: true')
-        ->and($command)->toContain('managedMissingPaths: self::REQUIRED_UPDATE_PATHS')
-        ->and($command)->toContain("'database/migrations/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php'")
+        ->and($command)->toContain('managedMissingPaths: $this->resolveRequiredUpdatePaths($basePath)')
+        ->and($command)->toContain("'database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php'")
         ->and($command)->not->toContain('publishProviderTag(CorePanelTenancyServiceProvider::class, $tag, $force);')
         ->and($command)->toContain('if ($basePath === null) {')
         ->and($command)->toContain('ensureTenancyProviderRegistered($basePath);')

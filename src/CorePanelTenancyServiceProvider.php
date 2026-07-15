@@ -319,11 +319,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
 
             $sourcePath = $file->getPathname();
             $relativePath = ltrim(str_replace($sourceRoot, '', $sourcePath), DIRECTORY_SEPARATOR);
-            $destinationPath = basename($relativePath);
-
-            if (str_starts_with($relativePath, 'tenant'.DIRECTORY_SEPARATOR)) {
-                $destinationPath = 'tenant'.DIRECTORY_SEPARATOR.basename($relativePath);
-            }
+            $destinationPath = $relativePath;
 
             $paths[$sourcePath] = rtrim($destinationRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$destinationPath;
         }

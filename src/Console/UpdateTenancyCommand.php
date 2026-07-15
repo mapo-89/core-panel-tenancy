@@ -11,6 +11,8 @@ use CorePanelTenancy\CorePanelTenancyServiceProvider;
 use CorePanelTenancy\Support\Install\HandleInertiaRequestsTenancyMerger;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 
 final class UpdateTenancyCommand extends Command
 {
@@ -32,7 +34,7 @@ final class UpdateTenancyCommand extends Command
      * @var list<string>
      */
     private const REQUIRED_UPDATE_PATHS = [
-        'database/migrations/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php',
+        'database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php',
     ];
 
     protected $signature = 'core-panel:tenancy:update
@@ -66,7 +68,8 @@ final class UpdateTenancyCommand extends Command
             $dryRun,
             $basePath,
             adoptUnmanagedExisting: true,
-            managedMissingPaths: self::REQUIRED_UPDATE_PATHS,
+            managedMissingPaths: $this->resolveRequiredUpdatePaths($basePath),
+            recreateManagedMissing: false,
         );
 
         $this->table(
@@ -152,5 +155,36 @@ final class UpdateTenancyCommand extends Command
         if ($updatedContents !== $contents) {
             $this->files->put($providersPath, $updatedContents);
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function resolveRequiredUpdatePaths(?string $basePath): array
+    {
+        $root = $basePath ?? base_path();
+        $migrationsRoot = $root.'/database/migrations';
+
+        if (! $this->files->isDirectory($migrationsRoot)) {
+            return self::REQUIRED_UPDATE_PATHS;
+        }
+
+        $existingBasenames = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($migrationsRoot, RecursiveDirectoryIterator::SKIP_DOTS),
+        );
+
+        foreach ($iterator as $file) {
+            if (! $file->isFile()) {
+                continue;
+            }
+
+            $existingBasenames[$file->getFilename()] = true;
+        }
+
+        return array_values(array_filter(
+            self::REQUIRED_UPDATE_PATHS,
+            static fn (string $path): bool => ! isset($existingBasenames[basename($path)]),
+        ));
     }
 }
