@@ -182,9 +182,9 @@ final class UpdateTenancyCommand extends Command
             $existingBasenames[$file->getFilename()] = true;
         }
 
-        return array_values(array_filter(
+        return array_filter(
             self::REQUIRED_UPDATE_PATHS,
             static fn (string $path): bool => ! isset($existingBasenames[basename($path)]),
-        ));
+        );
     }
 }
