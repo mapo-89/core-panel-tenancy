@@ -28,9 +28,9 @@ final readonly class WayfinderRouteUrlNormalizer
         $search = [];
 
         foreach ($hosts as $host) {
-            $search[] = '//'.$host;
             $search[] = 'https://'.$host;
             $search[] = 'http://'.$host;
+            $search[] = '//'.$host;
         }
 
         foreach ($this->files->allFiles($routesPath) as $file) {

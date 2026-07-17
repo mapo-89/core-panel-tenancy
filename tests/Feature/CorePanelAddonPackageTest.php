@@ -455,11 +455,11 @@ it('normalizes generated wayfinder route urls back to relative paths for central
         <<<'TS'
 export const show = {
     definition: {
-        url: '//core-panel-app.test/profile',
+        url: 'https://core-panel-app.test/profile',
     },
 };
 
-// @route '//core-panel-app.test/profile'
+// @route 'https://core-panel-app.test/profile'
 TS,
     );
 
@@ -472,7 +472,9 @@ TS,
 
     expect($contents)->toContain("url: '/profile'")
         ->and($contents)->toContain("// @route '/profile'")
-        ->and($contents)->not->toContain('//core-panel-app.test/profile');
+        ->and($contents)->not->toContain('//core-panel-app.test/profile')
+        ->and($contents)->not->toContain('https://core-panel-app.test/profile')
+        ->and($contents)->not->toContain('https:/profile');
 });
 
 it('normalizes url-like central domain inputs to bare hosts during tenancy installation', function (): void {
