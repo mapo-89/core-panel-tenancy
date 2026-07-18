@@ -29,7 +29,7 @@ return new class extends Migration
             $table->id(); // permission id
             $table->string('name');
             $table->string('guard_name');
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->unique(['name', 'guard_name']);
         });
@@ -48,7 +48,7 @@ return new class extends Migration
             $table->string('core_panel_group')->nullable();
             $table->boolean('core_panel_is_protected')->default(false);
             $table->json('core_panel_seeded_permissions')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
 
             if ($teams || config('permission.testing')) {
                 $table->unique([$columnNames['team_foreign_key'], 'name', 'guard_name']);

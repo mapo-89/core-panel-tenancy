@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('type');
             $table->boolean('is_public')->default(false);
             $table->boolean('is_localized')->default(false);
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->unique(['group', 'key']);
         });

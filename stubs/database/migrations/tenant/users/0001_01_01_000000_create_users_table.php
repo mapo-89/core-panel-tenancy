@@ -17,23 +17,23 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('locale', 12)->nullable();
             $table->string('status')->default('active');
-            $table->timestamp('email_verified_at')->nullable();
+            $table->timestampTz('email_verified_at')->nullable();
             $table->string('password');
             $table->boolean('requires_password_setup')->default(false);
-            $table->timestamp('invited_at')->nullable();
-            $table->timestamp('invitation_accepted_at')->nullable();
+            $table->timestampTz('invited_at')->nullable();
+            $table->timestampTz('invitation_accepted_at')->nullable();
             $table->text('two_factor_secret')->nullable();
             $table->text('two_factor_recovery_codes')->nullable();
-            $table->timestamp('two_factor_confirmed_at')->nullable();
+            $table->timestampTz('two_factor_confirmed_at')->nullable();
             $table->rememberToken();
-            $table->softDeletes();
-            $table->timestamps();
+            $table->softDeletesTz();
+            $table->timestampsTz();
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table): void {
             $table->string('email')->primary();
             $table->string('token');
-            $table->timestamp('created_at')->nullable();
+            $table->timestampTz('created_at')->nullable();
         });
 
         Schema::create('sessions', function (Blueprint $table): void {

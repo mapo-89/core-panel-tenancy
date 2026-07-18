@@ -22,11 +22,11 @@ return new class extends Migration
             $table->string('platform')->nullable();
             $table->string('ip_address', 45)->nullable()->index();
             $table->boolean('login_successful')->index();
-            $table->timestamp('login_at')->nullable()->index();
-            $table->timestamp('logout_at')->nullable()->index();
-            $table->timestamp('last_active_at')->nullable()->index();
+            $table->timestampTz('login_at')->nullable()->index();
+            $table->timestampTz('logout_at')->nullable()->index();
+            $table->timestampTz('last_active_at')->nullable()->index();
             $table->json('properties')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
         });
     }
 

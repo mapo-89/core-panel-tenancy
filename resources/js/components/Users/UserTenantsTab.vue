@@ -8,6 +8,7 @@ import { useDialog } from 'primevue/usedialog'
 
 import AppIcon from '@core-panel/components/AppIcon.vue'
 import { useCan } from '@core-panel/composables/useCan'
+import { useDateTime } from '@core-panel/composables/useDateTime'
 import TenantForm from '@/pages/Admin/Tenants/components/TenantForm.vue'
 import {
     destroy as destroyTenant,
@@ -47,13 +48,10 @@ const { can } = useCan()
 const dialog = useDialog()
 const confirm = useConfirm()
 const loading = ref(false)
+const { formatDateTime } = useDateTime()
 const tenantRecordsState = ref<TenantManagementRecord[]>(
     props.tenantRecords ?? [],
 )
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-})
 
 const tableSchema = computed<DataTableSchema>(() => ({
     actions: [],
@@ -272,9 +270,7 @@ watch(
                 <span class="text-sm text-[var(--cp-text-primary)]">
                     {{
                         row.created_at
-                            ? dateFormatter.format(
-                                  new Date(String(row.created_at)),
-                              )
+                            ? formatDateTime(String(row.created_at))
                             : '—'
                     }}
                 </span>
@@ -283,7 +279,7 @@ watch(
             <template #row-actions="{ row }">
                 <div class="flex justify-end gap-2">
                     <Button
-                        v-if="can('tenants.update')"
+                        v-if="can('tenants.update') && row.super_admin?.id"
                         v-tooltip.top="$t('page-tenants.impersonate')"
                         :aria-label="$t('page-tenants.impersonate')"
                         class="cp-datatable__action-button"

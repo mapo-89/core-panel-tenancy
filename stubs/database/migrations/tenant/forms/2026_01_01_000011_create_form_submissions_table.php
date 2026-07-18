@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('ip_address')->nullable();
             $table->text('user_agent')->nullable();
             $table->string('locale')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
         });
     }
 

@@ -13,7 +13,7 @@ return new class extends Migration
             $table->uuid('parent_id')->nullable()->index();
             $table->string('name');
             $table->string('slug');
-            $table->timestamps();
+            $table->timestampsTz();
         });
     }
 

@@ -18,8 +18,8 @@ return new class extends Migration
             $table->text('avatar_url')->nullable();
             $table->text('token_encrypted')->nullable();
             $table->text('refresh_token_encrypted')->nullable();
-            $table->timestamp('expires_at')->nullable();
-            $table->timestamps();
+            $table->timestampTz('expires_at')->nullable();
+            $table->timestampsTz();
 
             $table->unique(['provider', 'provider_user_id']);
         });

@@ -21,7 +21,7 @@ return new class extends Migration
             $table->index(['causer_type', 'causer_id'], 'causer');
             $table->json('attribute_changes')->nullable();
             $table->json('properties')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
         });
     }
 };

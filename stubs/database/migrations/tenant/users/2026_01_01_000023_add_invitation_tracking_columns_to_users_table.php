@@ -12,11 +12,11 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table): void {
             if (! Schema::hasColumn('users', 'invited_at')) {
-                $table->timestamp('invited_at')->nullable()->after('requires_password_setup');
+                $table->timestampTz('invited_at')->nullable()->after('requires_password_setup');
             }
 
             if (! Schema::hasColumn('users', 'invitation_accepted_at')) {
-                $table->timestamp('invitation_accepted_at')->nullable()->after('invited_at');
+                $table->timestampTz('invitation_accepted_at')->nullable()->after('invited_at');
             }
         });
     }

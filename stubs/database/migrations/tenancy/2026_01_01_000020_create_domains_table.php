@@ -14,7 +14,7 @@ return new class extends Migration
             $table->increments('id');
             $table->string('domain', 255)->unique();
             $table->string('tenant_id');
-            $table->timestamps();
+            $table->timestampsTz();
 
             $table->foreign('tenant_id')
                 ->references('id')

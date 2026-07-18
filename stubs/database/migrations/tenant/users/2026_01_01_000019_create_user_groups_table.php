@@ -14,15 +14,15 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('color', 7)->default('#6366F1');
-            $table->softDeletes();
-            $table->timestamps();
+            $table->softDeletesTz();
+            $table->timestampsTz();
         });
 
         Schema::create('user_group_user', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('user_group_id')->constrained('user_groups')->cascadeOnDelete();
             $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
-            $table->timestamps();
+            $table->timestampsTz();
             $table->unique(['user_group_id', 'user_id']);
         });
     }

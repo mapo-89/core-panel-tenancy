@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('user_id');
             $table->string('auth_guard');
             $table->string('redirect_url');
-            $table->timestamp('created_at');
+            $table->timestampTz('created_at');
 
             $table->foreign('tenant_id')
                 ->references('id')

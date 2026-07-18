@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('extension')->nullable();
             $table->jsonb('meta_json')->nullable();
             $table->string('uploaded_by')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
         });
     }
 

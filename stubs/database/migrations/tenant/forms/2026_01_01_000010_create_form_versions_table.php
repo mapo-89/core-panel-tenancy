@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedInteger('version');
             $table->jsonb('schema_json');
             $table->string('created_by')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
         });
     }
 

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->jsonb('schema_json');
             $table->jsonb('settings_json')->nullable();
             $table->string('created_by')->nullable();
-            $table->timestamps();
+            $table->timestampsTz();
         });
     }
 

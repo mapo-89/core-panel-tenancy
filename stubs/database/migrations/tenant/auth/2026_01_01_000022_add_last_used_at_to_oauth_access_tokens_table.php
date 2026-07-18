@@ -13,7 +13,7 @@ return new class extends Migration
     {
         if (! Schema::hasColumn('oauth_access_tokens', 'last_used_at')) {
             Schema::table('oauth_access_tokens', function (Blueprint $table) {
-                $table->timestamp('last_used_at')->nullable()->after('updated_at');
+                $table->timestampTz('last_used_at')->nullable()->after('updated_at');
             });
         }
     }
