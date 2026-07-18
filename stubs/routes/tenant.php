@@ -54,8 +54,8 @@ $corePanelRouteMiddleware = array_values(array_filter(
     static fn (string $middleware): bool => $middleware !== 'web',
 ));
 
-Route::middleware($tenantWebMiddleware)->group(function () use ($corePanelRouteMiddleware, $loadTenantWebRouteFile, $webRoutes): void {
-    Route::name('tenant.')->group(function () use ($corePanelRouteMiddleware, $loadTenantWebRouteFile, $webRoutes): void {
+Route::middleware($tenantWebMiddleware)->group(function () use ($corePanelRouteMiddleware, $loadTenantWebRouteFile, $webRoutes, $packageTenancyRoutesRoot): void {
+    Route::name('tenant.')->group(function () use ($corePanelRouteMiddleware, $loadTenantWebRouteFile, $webRoutes, $packageTenancyRoutesRoot): void {
         Route::redirect('/', config('core-panel.route_prefix', 'admin'));
         Route::get('/impersonate/{token}', TenantImpersonationController::class)->name('impersonate');
         Route::get('/leave-impersonation', LeaveTenantImpersonationController::class)->name('leave-impersonation');
@@ -68,7 +68,7 @@ Route::middleware($tenantWebMiddleware)->group(function () use ($corePanelRouteM
             RedirectImpersonatingTenantGuest::class,
             ...$corePanelRouteMiddleware,
             'core-panel.verified',
-        ])->group(function () use ($loadTenantWebRouteFile, $webRoutes): void {
+        ])->group(function () use ($loadTenantWebRouteFile, $webRoutes, $packageTenancyRoutesRoot): void {
             foreach ($webRoutes['authenticated_without_permission'] as $authenticatedRouteFile) {
                 $loadTenantWebRouteFile($authenticatedRouteFile);
             }
