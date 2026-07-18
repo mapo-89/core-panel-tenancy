@@ -26,6 +26,7 @@ $tenantWebMiddleware = [
 ];
 $webRoutes = require base_path('routes/web/routes.php');
 $packageWebRoutesRoot = base_path('vendor/mapo-89/core-panel/routes/web');
+$packageTenancyRoutesRoot = base_path('vendor/mapo-89/core-panel-tenancy/routes/web');
 $loadTenantWebRouteFile = static function (string $file) use ($packageWebRoutesRoot): void {
     $hostRoutePath = base_path('routes/web/'.$file);
 
@@ -72,13 +73,23 @@ Route::middleware($tenantWebMiddleware)->group(function () use ($corePanelRouteM
                 $loadTenantWebRouteFile($authenticatedRouteFile);
             }
 
-            Route::middleware('check.permission')->group(function () use ($loadTenantWebRouteFile, $webRoutes): void {
+            Route::middleware('check.permission')->group(function () use ($loadTenantWebRouteFile, $webRoutes, $packageTenancyRoutesRoot): void {
                 foreach ($webRoutes['permission_protected'] as $permissionProtectedRouteFile) {
                     $loadTenantWebRouteFile($permissionProtectedRouteFile);
                 }
 
-                if (file_exists(base_path('routes/web/tenants.php'))) {
-                    require base_path('routes/web/tenants.php');
+                $hostTenantRoutesPath = base_path('routes/web/tenants.php');
+
+                if (is_file($hostTenantRoutesPath)) {
+                    require $hostTenantRoutesPath;
+
+                    return;
+                }
+
+                $packageTenantRoutesPath = $packageTenancyRoutesRoot.'/tenants.php';
+
+                if (is_file($packageTenantRoutesPath)) {
+                    require $packageTenantRoutesPath;
                 }
             });
         });
