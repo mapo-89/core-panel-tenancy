@@ -19,6 +19,10 @@ final readonly class CentralImpersonationContext
 
     public const SESSION_KEY = 'tenant_impersonation.central_user_id';
 
+    public const TENANT_AUTH_GUARD_SESSION_KEY = 'tenant_impersonation.tenant_auth_guard';
+
+    public const TENANT_USER_ID_SESSION_KEY = 'tenant_impersonation.tenant_user_id';
+
     public function __construct(private PermissionService $permissions) {}
 
     public function encryptedPayload(Authenticatable $user): string
@@ -50,6 +54,23 @@ final readonly class CentralImpersonationContext
         $request->session()->put(self::SESSION_KEY, trim($centralUserId));
     }
 
+    public function storeTenantAuthentication(Request $request, string $guard, string $userId): void
+    {
+        if (! $request->hasSession()) {
+            return;
+        }
+
+        $guard = trim($guard);
+        $userId = trim($userId);
+
+        if ($guard === '' || $userId === '') {
+            return;
+        }
+
+        $request->session()->put(self::TENANT_AUTH_GUARD_SESSION_KEY, $guard);
+        $request->session()->put(self::TENANT_USER_ID_SESSION_KEY, $userId);
+    }
+
     public function centralUser(Request $request): ?Authenticatable
     {
         return $this->runInCentralContext(fn (): ?Authenticatable => $this->resolveCentralUser($request));
@@ -76,7 +97,42 @@ final readonly class CentralImpersonationContext
             return;
         }
 
-        $request->session()->forget(self::SESSION_KEY);
+        $request->session()->forget([
+            self::SESSION_KEY,
+            self::TENANT_AUTH_GUARD_SESSION_KEY,
+            self::TENANT_USER_ID_SESSION_KEY,
+        ]);
+    }
+
+    public function restoreTenantAuthentication(Request $request): ?Authenticatable
+    {
+        if (! $request->hasSession()) {
+            return null;
+        }
+
+        $guardName = $request->session()->get(self::TENANT_AUTH_GUARD_SESSION_KEY);
+        $userId = $request->session()->get(self::TENANT_USER_ID_SESSION_KEY);
+
+        if (! is_string($guardName) || trim($guardName) === '' || ! is_string($userId) || trim($userId) === '') {
+            return null;
+        }
+
+        $guard = Auth::guard(trim($guardName));
+        $user = $guard->user();
+
+        if ($user instanceof Authenticatable) {
+            return $user;
+        }
+
+        if ($guard->loginUsingId(trim($userId)) === false) {
+            return null;
+        }
+
+        $restoredUser = $guard->user();
+
+        return $restoredUser instanceof Authenticatable
+            ? $restoredUser
+            : null;
     }
 
     public function restoreCentralAuthentication(Request $request): ?Authenticatable

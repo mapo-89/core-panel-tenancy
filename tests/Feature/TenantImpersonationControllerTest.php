@@ -84,6 +84,29 @@ it('aborts failed tenant impersonation logins before storing context or deleting
     }
 
     expect($session->has(CentralImpersonationContext::SESSION_KEY))->toBeFalse()
+        ->and($session->has(CentralImpersonationContext::TENANT_AUTH_GUARD_SESSION_KEY))->toBeFalse()
+        ->and($session->has(CentralImpersonationContext::TENANT_USER_ID_SESSION_KEY))->toBeFalse()
         ->and(ImpersonationToken::find($token))->not->toBeNull()
         ->and($guard->id())->toBe($currentTenantUser->getAuthIdentifier());
+
+    tenancy()->end();
+});
+
+it('stores and clears tenant authentication context in the impersonation session', function (): void {
+    $request = Request::create('/testing/tenant-impersonation', 'GET');
+    $session = app('session.store');
+    $session->start();
+    $request->setLaravelSession($session);
+
+    $context = app(CentralImpersonationContext::class);
+
+    $context->storeTenantAuthentication($request, 'web', 'tenant-user-id');
+
+    expect($session->get(CentralImpersonationContext::TENANT_AUTH_GUARD_SESSION_KEY))->toBe('web')
+        ->and($session->get(CentralImpersonationContext::TENANT_USER_ID_SESSION_KEY))->toBe('tenant-user-id');
+
+    $context->forget($request);
+
+    expect($session->has(CentralImpersonationContext::TENANT_AUTH_GUARD_SESSION_KEY))->toBeFalse()
+        ->and($session->has(CentralImpersonationContext::TENANT_USER_ID_SESSION_KEY))->toBeFalse();
 });

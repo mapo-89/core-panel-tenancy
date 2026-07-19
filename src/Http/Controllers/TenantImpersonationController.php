@@ -39,10 +39,13 @@ final class TenantImpersonationController extends Controller
 
         abort_unless(Auth::guard($authGuard)->loginUsingId($userId) !== false, 403);
 
-        app(CentralImpersonationContext::class)->storeFromEncryptedPayload(
+        $context = app(CentralImpersonationContext::class);
+
+        $context->storeFromEncryptedPayload(
             $request,
             $request->query(CentralImpersonationContext::QUERY_KEY),
         );
+        $context->storeTenantAuthentication($request, $authGuard, $userId);
 
         $impersonationToken->delete();
 

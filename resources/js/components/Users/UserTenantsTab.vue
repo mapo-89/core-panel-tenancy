@@ -7,6 +7,8 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useDialog } from 'primevue/usedialog'
 
 import AppIcon from '@core-panel/components/AppIcon.vue'
+import TableBuilderDataTable from '@core-panel/components/TableBuilder/DataTable.vue'
+import type { DataTableSchema } from '@core-panel/components/TableBuilder/types'
 import { useCan } from '@core-panel/composables/useCan'
 import { useDateTime } from '@core-panel/composables/useDateTime'
 import TenantForm from '@/pages/Admin/Tenants/components/TenantForm.vue'
@@ -15,8 +17,6 @@ import {
     dtApi as tenantDtApi,
     impersonate as impersonateTenant,
 } from '@/routes/tenants'
-import TableBuilderDataTable from '@core-panel/components/TableBuilder/DataTable.vue'
-import type { DataTableSchema } from '@core-panel/components/TableBuilder/types'
 
 type TenantManagementRecord = {
     id: string
@@ -229,6 +229,15 @@ watch(
         await loadTenants()
     },
 )
+
+watch(
+    () => props.tenantRecords,
+    (tenantRecords) => {
+        if (Array.isArray(tenantRecords)) {
+            tenantRecordsState.value = tenantRecords
+        }
+    },
+)
 </script>
 
 <template>
@@ -240,6 +249,7 @@ watch(
                     : '0px'
             "
             :loading="loading"
+            mode="local"
             :schema="tableSchema"
             surface-class="cp-user-tenants-tab__surface"
         >
@@ -288,7 +298,7 @@ watch(
                         size="small"
                         @click="impersonate(row as TenantManagementRecord)"
                     >
-                        <AppIcon name="arrow-right" />
+                        <AppIcon name="user-round-plus" />
                     </Button>
                     <Button
                         v-if="can('tenants.update')"

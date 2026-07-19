@@ -18,7 +18,13 @@ final class RedirectImpersonatingTenantGuest
             return $next($request);
         }
 
-        if (app(CentralImpersonationContext::class)->centralUser($request) === null) {
+        $context = app(CentralImpersonationContext::class);
+
+        if ($context->centralUser($request) === null) {
+            return $next($request);
+        }
+
+        if ($context->restoreTenantAuthentication($request) !== null) {
             return $next($request);
         }
 

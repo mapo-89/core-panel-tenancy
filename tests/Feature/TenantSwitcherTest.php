@@ -138,3 +138,42 @@ it('redirects impersonating tenant guests to leave impersonation instead of the 
 
     $response->assertRedirect(route('tenant.leave-impersonation'));
 });
+
+it('restores tenant authentication for impersonating central admins before redirecting them away', function (): void {
+    $this->migrateScaffoldDatabase();
+
+    config()->set('core-panel.user_model', ConfiguredCorePanelUser::class);
+    config()->set('auth.providers.users.model', ConfiguredCorePanelUser::class);
+    config()->set('tenancy.database.central_connection', 'sqlite');
+
+    $centralUser = ConfiguredCorePanelUser::query()->create([
+        'id' => 'central-user-id',
+        'email' => 'central@example.test',
+        'first_name' => 'Central',
+        'last_name' => 'Admin',
+        'password' => bcrypt('password'),
+    ]);
+    $tenantUser = ConfiguredCorePanelUser::query()->create([
+        'id' => 'tenant-user-id',
+        'email' => 'tenant@example.test',
+        'first_name' => 'Tenant',
+        'last_name' => 'Admin',
+        'password' => bcrypt('password'),
+    ]);
+
+    Route::middleware(['web', RedirectImpersonatingTenantGuest::class])
+        ->name('tenant.')
+        ->group(function (): void {
+            Route::get('/tenant/dashboard', static fn (Request $request): string => (string) $request->user()?->getAuthIdentifier())->name('dashboard');
+            Route::get('/tenant/leave-impersonation', static fn (): string => 'leave')->name('leave-impersonation');
+        });
+
+    $response = $this->withSession([
+        CentralImpersonationContext::SESSION_KEY => $centralUser->getAuthIdentifier(),
+        CentralImpersonationContext::TENANT_AUTH_GUARD_SESSION_KEY => 'web',
+        CentralImpersonationContext::TENANT_USER_ID_SESSION_KEY => $tenantUser->getAuthIdentifier(),
+    ])->get('/tenant/dashboard');
+
+    $response->assertOk()
+        ->assertSeeText((string) $tenantUser->getAuthIdentifier());
+});
