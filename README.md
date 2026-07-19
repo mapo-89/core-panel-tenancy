@@ -33,6 +33,8 @@ Host applications can extend the conversion lists for addon-specific or project-
 - `core-panel.database.timestamp_tz_conversion.datasets.tenancy`
 - `core-panel.database.timestamp_tz_conversion.datasets.tenant`
 
+The conversion uses the configured source timezone from `core-panel.database.timestamp_tz_conversion.legacy_timezone` and converts directly to `timestamptz`, so the stored instant does not depend on the PostgreSQL session timezone.
+
 ## Update
 
 Update the addon inside an installed application:

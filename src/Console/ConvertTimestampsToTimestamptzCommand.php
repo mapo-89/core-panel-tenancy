@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace CorePanelTenancy\Console;
 
 use CorePanel\Support\Database\TimestampTzConverter;
+use CorePanelTenancy\Support\TenantModelResolver;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 use Throwable;
 
 final class ConvertTimestampsToTimestamptzCommand extends Command
@@ -27,6 +29,11 @@ final class ConvertTimestampsToTimestamptzCommand extends Command
      * @var list<string>
      */
     protected $aliases = ['core-panel:convert-timestamps-to-timestamptz'];
+
+    public function __construct(private readonly TenantModelResolver $models)
+    {
+        parent::__construct();
+    }
 
     public function handle(TimestampTzConverter $converter): int
     {
@@ -117,10 +124,9 @@ final class ConvertTimestampsToTimestamptzCommand extends Command
 
         return $this->components->confirm(
             sprintf(
-                'Convert legacy timestamp columns for [%s] from [%s] to [%s]? ',
+                'Convert legacy timestamp columns for [%s] using source timezone [%s] and store them as timestamptz instants? ',
                 implode(', ', $targets),
                 (string) config('core-panel.database.timestamp_tz_conversion.legacy_timezone', 'Europe/Berlin'),
-                (string) config('core-panel.database.timestamp_tz_conversion.target_timezone', 'UTC'),
             ),
             false,
         );
@@ -153,11 +159,11 @@ final class ConvertTimestampsToTimestamptzCommand extends Command
     }
 
     /**
-     * @return Collection<int, Model>
+     * @return Collection<int, Model&TenantContract>
      */
     private function tenants()
     {
-        $tenantModel = (string) config('tenancy.tenant_model');
+        $tenantModel = $this->models->tenantModelClass();
         $tenantIds = array_values(array_filter(
             array_map(
                 static fn (mixed $tenantId): string => is_string($tenantId) ? trim($tenantId) : '',
@@ -166,14 +172,17 @@ final class ConvertTimestampsToTimestamptzCommand extends Command
             static fn (string $tenantId): bool => $tenantId !== '',
         ));
 
-        /** @var class-string<Model> $tenantModel */
         $query = $tenantModel::query()->orderBy('id');
 
         if ($tenantIds !== []) {
             $query->whereIn('id', $tenantIds);
         }
 
-        return $query->get();
+        return new Collection(
+            $query->get()
+                ->map(fn (Model $tenant): Model => $this->requireTenantContract($tenant))
+                ->all(),
+        );
     }
 
     private function tenantLabel(Model $tenant): string
@@ -183,6 +192,18 @@ final class ConvertTimestampsToTimestamptzCommand extends Command
         return is_string($displayName) && trim($displayName) !== ''
             ? trim($displayName)
             : (string) $tenant->getKey();
+    }
+
+    /**
+     * @return Model&TenantContract
+     */
+    private function requireTenantContract(Model $tenant): Model
+    {
+        if (! $tenant instanceof TenantContract) {
+            throw new \InvalidArgumentException('Configured tenant model must implement the tenancy tenant contract.');
+        }
+
+        return $tenant;
     }
 
     /**
