@@ -18,6 +18,21 @@ php artisan core-panel-tenancy:install
 
 If you install through the CorePanel installer, the addon can also be pulled in during `php artisan core-panel:install`.
 
+## Timestamp Conversion
+
+When the tenancy addon is installed, the CorePanel timestamp conversion command also supports tenancy metadata tables and tenant databases:
+
+```bash
+php artisan core-panel:convert-timestamps-tz --tenancy --dry-run
+php artisan core-panel:convert-timestamps-tz --tenant --dry-run
+php artisan core-panel:convert-timestamps-tz --central --tenancy --tenant --force
+```
+
+Host applications can extend the conversion lists for addon-specific or project-specific tables in `config/core-panel.php` under:
+
+- `core-panel.database.timestamp_tz_conversion.datasets.tenancy`
+- `core-panel.database.timestamp_tz_conversion.datasets.tenant`
+
 ## Update
 
 Update the addon inside an installed application:

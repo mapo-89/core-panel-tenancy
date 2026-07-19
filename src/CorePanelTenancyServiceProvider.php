@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CorePanelTenancy;
 
 use CorePanel\Contracts\SettingsLogoUrlGenerator;
+use CorePanelTenancy\Console\ConvertTimestampsToTimestamptzCommand;
 use CorePanelTenancy\Console\InstallTenancyCommand;
 use CorePanelTenancy\Console\UpdateTenancyCommand;
 use CorePanelTenancy\Domains\Tenancy\Policies\TenantPolicy;
@@ -25,6 +26,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeCorePanelAccessConfig();
+        $this->mergeTimestampTzConversionConfig();
         $this->mergeFortifyMiddlewareConfig();
         $this->configureMediaLibraryForTenancy();
         $this->app->bind(SettingsLogoUrlGenerator::class, TenantAwareSettingsLogoUrlGenerator::class);
@@ -47,6 +49,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         }
 
         $this->commands([
+            ConvertTimestampsToTimestamptzCommand::class,
             InstallTenancyCommand::class,
             UpdateTenancyCommand::class,
         ]);
@@ -253,6 +256,52 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         }
 
         config()->set('media-library.url_generator', TenantAwareUrlGenerator::class);
+    }
+
+    private function mergeTimestampTzConversionConfig(): void
+    {
+        /** @var array<string, mixed> $databaseConfig */
+        $databaseConfig = (array) config('core-panel.database', []);
+        /** @var array<string, mixed> $conversionConfig */
+        $conversionConfig = (array) ($databaseConfig['timestamp_tz_conversion'] ?? []);
+        /** @var array<string, mixed> $datasets */
+        $datasets = (array) ($conversionConfig['datasets'] ?? []);
+
+        $datasets['tenancy'] = array_merge(
+            (array) ($datasets['tenancy'] ?? []),
+            [
+                'domains' => ['created_at', 'updated_at'],
+                'tenant_user_impersonation_tokens' => ['created_at'],
+                'tenants' => ['created_at', 'updated_at'],
+            ],
+        );
+
+        $datasets['tenant'] = array_merge(
+            (array) ($datasets['tenant'] ?? []),
+            [
+                'activity_log' => ['created_at', 'updated_at'],
+                'authentication_logs' => ['created_at', 'last_active_at', 'login_at', 'logout_at', 'updated_at'],
+                'failed_jobs' => ['failed_at'],
+                'file_folders' => ['created_at', 'updated_at'],
+                'form_submissions' => ['created_at', 'updated_at'],
+                'form_versions' => ['created_at', 'updated_at'],
+                'forms' => ['created_at', 'updated_at'],
+                'managed_files' => ['created_at', 'updated_at'],
+                'oauth_access_tokens' => ['created_at', 'last_used_at', 'updated_at'],
+                'oauth_clients' => ['created_at', 'updated_at'],
+                'password_reset_tokens' => ['created_at'],
+                'settings' => ['created_at', 'updated_at'],
+                'social_accounts' => ['created_at', 'expires_at', 'updated_at'],
+                'user_group_user' => ['created_at', 'updated_at'],
+                'user_groups' => ['created_at', 'deleted_at', 'updated_at'],
+                'users' => ['created_at', 'deleted_at', 'email_verified_at', 'invitation_accepted_at', 'invited_at', 'two_factor_confirmed_at', 'updated_at'],
+            ],
+        );
+
+        $conversionConfig['datasets'] = $datasets;
+        $databaseConfig['timestamp_tz_conversion'] = $conversionConfig;
+
+        config()->set('core-panel.database', $databaseConfig);
     }
 
     private function shareTenancyContext(): void

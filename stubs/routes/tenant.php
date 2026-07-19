@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use CorePanelTenancy\Http\Controllers\CentralTenantImpersonationController;
 use CorePanelTenancy\Http\Controllers\LeaveTenantImpersonationController;
 use CorePanelTenancy\Http\Controllers\TenantImpersonationController;
 use CorePanelTenancy\Http\Middleware\RedirectImpersonatingTenantGuest;
@@ -26,7 +27,6 @@ $tenantWebMiddleware = [
 ];
 $webRoutes = require base_path('routes/web/routes.php');
 $packageWebRoutesRoot = base_path('vendor/mapo-89/core-panel/routes/web');
-$packageTenancyRoutesRoot = base_path('vendor/mapo-89/core-panel-tenancy/routes/web');
 $loadTenantWebRouteFile = static function (string $file) use ($packageWebRoutesRoot): void {
     $hostRoutePath = base_path('routes/web/'.$file);
 
@@ -54,8 +54,8 @@ $corePanelRouteMiddleware = array_values(array_filter(
     static fn (string $middleware): bool => $middleware !== 'web',
 ));
 
-Route::middleware($tenantWebMiddleware)->group(function () use ($corePanelRouteMiddleware, $loadTenantWebRouteFile, $webRoutes, $packageTenancyRoutesRoot): void {
-    Route::name('tenant.')->group(function () use ($corePanelRouteMiddleware, $loadTenantWebRouteFile, $webRoutes, $packageTenancyRoutesRoot): void {
+Route::middleware($tenantWebMiddleware)->group(function () use ($corePanelRouteMiddleware, $loadTenantWebRouteFile, $webRoutes): void {
+    Route::name('tenant.')->group(function () use ($corePanelRouteMiddleware, $loadTenantWebRouteFile, $webRoutes): void {
         Route::redirect('/', config('core-panel.route_prefix', 'admin'));
         Route::get('/impersonate/{token}', TenantImpersonationController::class)->name('impersonate');
         Route::get('/leave-impersonation', LeaveTenantImpersonationController::class)->name('leave-impersonation');
@@ -68,29 +68,18 @@ Route::middleware($tenantWebMiddleware)->group(function () use ($corePanelRouteM
             RedirectImpersonatingTenantGuest::class,
             ...$corePanelRouteMiddleware,
             'core-panel.verified',
-        ])->group(function () use ($loadTenantWebRouteFile, $webRoutes, $packageTenancyRoutesRoot): void {
+        ])->group(function () use ($loadTenantWebRouteFile, $webRoutes): void {
             foreach ($webRoutes['authenticated_without_permission'] as $authenticatedRouteFile) {
                 $loadTenantWebRouteFile($authenticatedRouteFile);
             }
 
-            Route::middleware('check.permission')->group(function () use ($loadTenantWebRouteFile, $webRoutes, $packageTenancyRoutesRoot): void {
+            Route::middleware('check.permission')->group(function () use ($loadTenantWebRouteFile, $webRoutes): void {
                 foreach ($webRoutes['permission_protected'] as $permissionProtectedRouteFile) {
                     $loadTenantWebRouteFile($permissionProtectedRouteFile);
                 }
 
-                $hostTenantRoutesPath = base_path('routes/web/tenants.php');
-
-                if (is_file($hostTenantRoutesPath)) {
-                    require $hostTenantRoutesPath;
-
-                    return;
-                }
-
-                $packageTenantRoutesPath = $packageTenancyRoutesRoot.'/tenants.php';
-
-                if (is_file($packageTenantRoutesPath)) {
-                    require $packageTenantRoutesPath;
-                }
+                Route::post('/tenants/{tenant}/impersonate', CentralTenantImpersonationController::class)
+                    ->name('tenants.impersonate');
             });
         });
     });
