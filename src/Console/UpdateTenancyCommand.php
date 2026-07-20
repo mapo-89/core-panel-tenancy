@@ -141,20 +141,57 @@ final class UpdateTenancyCommand extends Command
         }
 
         $contents = (string) $this->files->get($providersPath);
+        $import = "use App\\Providers\\TenancyServiceProvider;\n";
+        $shortReference = 'TenancyServiceProvider::class';
+        $qualifiedReference = 'App\\Providers\\TenancyServiceProvider::class';
 
-        if (str_contains($contents, 'App\\Providers\\TenancyServiceProvider::class')) {
-            return;
+        $updatedContents = $contents;
+
+        if (str_contains($updatedContents, $qualifiedReference)) {
+            if (! str_contains($updatedContents, $import)) {
+                $updatedContents = $this->prependProviderImport($updatedContents, $import);
+            }
+
+            $updatedContents = str_replace($qualifiedReference, $shortReference, $updatedContents);
+        } elseif (str_contains($contents, $shortReference)) {
+            if (! str_contains($contents, $import)) {
+                $updatedContents = $this->prependProviderImport($contents, $import);
+            } else {
+                return;
+            }
+        } else {
+            if (! str_contains($updatedContents, $import)) {
+                $updatedContents = $this->prependProviderImport($updatedContents, $import);
+            }
+
+            $updatedContents = str_replace(
+                '];',
+                "    {$shortReference},\n];",
+                $updatedContents,
+            );
         }
-
-        $updatedContents = str_replace(
-            '];',
-            "    App\\Providers\\TenancyServiceProvider::class,\n];",
-            $contents,
-        );
 
         if ($updatedContents !== $contents) {
             $this->files->put($providersPath, $updatedContents);
         }
+    }
+
+    private function prependProviderImport(string $contents, string $import): string
+    {
+        if (str_contains($contents, $import)) {
+            return $contents;
+        }
+
+        if (preg_match('/^use [^;]+;\n/m', $contents) === 1) {
+            return preg_replace('/^((?:use [^;]+;\n)+)/m', "$1{$import}", $contents, 1) ?? $contents;
+        }
+
+        return preg_replace(
+            "/^(<\\?php\\n(?:\\ndeclare\\(strict_types=1\\);)?\\n)/",
+            "$1{$import}\n",
+            $contents,
+            1,
+        ) ?? $contents;
     }
 
     /**

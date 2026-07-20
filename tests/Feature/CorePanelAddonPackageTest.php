@@ -802,5 +802,37 @@ it('refreshes tenancy publish tags through the addon provider for in-place updat
         ->and($command)->toContain('if ($basePath === null) {')
         ->and($command)->toContain('ensureTenancyProviderRegistered($basePath);')
         ->and($command)->toContain('handleInertiaRequestsTenancyMerger->merge($basePath);')
-        ->and($command)->toContain('App\\\\Providers\\\\TenancyServiceProvider::class');
+        ->and($command)->toContain('App\\\\Providers\\\\TenancyServiceProvider::class')
+        ->and($command)->toContain('use App\\\\Providers\\\\TenancyServiceProvider;')
+        ->and($command)->toContain("TenancyServiceProvider::class");
+});
+
+it('normalizes bootstrap providers to the imported tenancy provider style during updates', function (): void {
+    $basePath = makeTenancyUpdateBasePath('normalize-tenancy-provider-import');
+
+    mkdir($basePath.'/bootstrap', 0777, true);
+    file_put_contents($basePath.'/bootstrap/providers.php', <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+use App\Providers\AppServiceProvider;
+use App\Providers\FortifyServiceProvider;
+
+return [
+    AppServiceProvider::class,
+    App\Providers\TenancyServiceProvider::class,
+    FortifyServiceProvider::class,
+];
+PHP);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $providers = file_get_contents($basePath.'/bootstrap/providers.php');
+
+    expect($providers)->toContain('use App\\Providers\\TenancyServiceProvider;')
+        ->and($providers)->toContain('TenancyServiceProvider::class,')
+        ->and($providers)->not->toContain("    App\\Providers\\TenancyServiceProvider::class,");
 });
