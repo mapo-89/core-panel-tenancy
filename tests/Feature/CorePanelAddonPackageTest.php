@@ -192,6 +192,8 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantModel)->toContain('class Tenant extends BaseTenant implements TenantWithDatabase')
         ->and($tenantModel)->toContain('use HasDatabase;')
         ->and($tenantModel)->toContain('use HasDomains;')
+        ->and($tenantModel)->toContain('public function getDisplayNameAttribute(): string')
+        ->and($tenantModel)->toContain("return \$this->primary_domain ?? (string) \$this->getKey();")
         ->and($tenantModel)->not->toContain('getCustomColumns')
         ->and($tenantController)->toContain("return redirect()->route('core-panel.users.index', ['tab' => 'tenants']);")
         ->and($tenantController)->toContain('public function dtApi(): JsonResponse')

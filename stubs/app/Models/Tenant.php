@@ -27,4 +27,15 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             ->orderBy('id')
             ->first()?->domain;
     }
+
+    public function getDisplayNameAttribute(): string
+    {
+        $name = is_string($this->name) ? trim($this->name) : '';
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        return $this->primary_domain ?? (string) $this->getKey();
+    }
 }
