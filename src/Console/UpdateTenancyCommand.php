@@ -141,32 +141,40 @@ final class UpdateTenancyCommand extends Command
         }
 
         $contents = (string) $this->files->get($providersPath);
-        $import = "use App\\Providers\\TenancyServiceProvider;\n";
+        $lineEnding = $this->detectLineEnding($contents);
+        $import = "use App\\Providers\\TenancyServiceProvider;{$lineEnding}";
         $shortReference = 'TenancyServiceProvider::class';
         $qualifiedReference = 'App\\Providers\\TenancyServiceProvider::class';
+        $hasTenancyProviderImport = $this->hasTenancyProviderImport($contents);
+        $hasQualifiedTenancyProviderRegistration = $this->hasTenancyProviderRegistration($contents, true);
+        $hasShortTenancyProviderRegistration = $this->hasTenancyProviderRegistration($contents, false);
 
         $updatedContents = $contents;
 
-        if (str_contains($updatedContents, $qualifiedReference)) {
-            if (! str_contains($updatedContents, $import)) {
+        if ($hasQualifiedTenancyProviderRegistration) {
+            if (! $hasTenancyProviderImport) {
                 $updatedContents = $this->prependProviderImport($updatedContents, $import);
             }
 
-            $updatedContents = str_replace($qualifiedReference, $shortReference, $updatedContents);
-        } elseif (str_contains($contents, $shortReference)) {
-            if (! str_contains($contents, $import)) {
+            $updatedContents = preg_replace(
+                '/\\\\?App\\\\Providers\\\\TenancyServiceProvider::class/',
+                $shortReference,
+                $updatedContents,
+            ) ?? $updatedContents;
+        } elseif ($hasShortTenancyProviderRegistration) {
+            if (! $hasTenancyProviderImport) {
                 $updatedContents = $this->prependProviderImport($contents, $import);
             } else {
                 return;
             }
         } else {
-            if (! str_contains($updatedContents, $import)) {
+            if (! $hasTenancyProviderImport) {
                 $updatedContents = $this->prependProviderImport($updatedContents, $import);
             }
 
             $updatedContents = str_replace(
                 '];',
-                "    {$shortReference},\n];",
+                "    {$shortReference},{$lineEnding}];",
                 $updatedContents,
             );
         }
@@ -178,20 +186,79 @@ final class UpdateTenancyCommand extends Command
 
     private function prependProviderImport(string $contents, string $import): string
     {
-        if (str_contains($contents, $import)) {
+        if ($this->hasTenancyProviderImport($contents)) {
             return $contents;
         }
 
-        if (preg_match('/^use [^;]+;\n/m', $contents) === 1) {
-            return preg_replace('/^((?:use [^;]+;\n)+)/m', "$1{$import}", $contents, 1) ?? $contents;
+        $lineEnding = $this->detectLineEnding($contents);
+
+        if (preg_match('/^use [^;]+;\R/m', $contents) === 1) {
+            return preg_replace('/^((?:use [^;]+;\R)+)/m', "$1{$import}", $contents, 1) ?? $contents;
         }
 
-        return preg_replace(
-            "/^(<\\?php\\n(?:\\ndeclare\\(strict_types=1\\);)?\\n)/",
-            "$1{$import}\n",
-            $contents,
-            1,
-        ) ?? $contents;
+        if (preg_match('/^return\s+\[/m', $contents) === 1) {
+            return preg_replace(
+                '/^return\s+\[/m',
+                "{$import}{$lineEnding}return [",
+                $contents,
+                1,
+            ) ?? $contents;
+        }
+
+        return preg_replace('/^<\\?php\R?/', "<?php{$lineEnding}{$lineEnding}{$import}{$lineEnding}", $contents, 1) ?? $contents;
+    }
+
+    private function hasTenancyProviderImport(string $contents): bool
+    {
+        return preg_match('/^\s*use\s+App\\\\Providers\\\\TenancyServiceProvider\s*;\s*(?:(?:\/\/|#).*)?$/m', $contents) === 1;
+    }
+
+    private function hasTenancyProviderRegistration(string $contents, bool $qualified): bool
+    {
+        $provider = $qualified
+            ? '\\\\?App\\\\Providers\\\\TenancyServiceProvider::class'
+            : 'TenancyServiceProvider::class';
+        $commentStrippedContents = $this->stripPhpComments($contents);
+
+        return preg_match(
+            '/(?:^|[\[,]\s*)'.$provider.'(?=\s*(?:,|\]))/m',
+            $commentStrippedContents,
+        ) === 1;
+    }
+
+    private function stripPhpComments(string $contents): string
+    {
+        $tokens = token_get_all($contents);
+        $stripped = '';
+
+        foreach ($tokens as $token) {
+            if (! is_array($token)) {
+                $stripped .= $token;
+
+                continue;
+            }
+
+            if (in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                continue;
+            }
+
+            $stripped .= $token[1];
+        }
+
+        return $stripped;
+    }
+
+    private function detectLineEnding(string $contents): string
+    {
+        if (str_contains($contents, "\r\n")) {
+            return "\r\n";
+        }
+
+        if (str_contains($contents, "\r")) {
+            return "\r";
+        }
+
+        return "\n";
     }
 
     /**

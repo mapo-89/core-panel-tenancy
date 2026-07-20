@@ -193,7 +193,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantModel)->toContain('use HasDatabase;')
         ->and($tenantModel)->toContain('use HasDomains;')
         ->and($tenantModel)->toContain('public function getDisplayNameAttribute(): string')
-        ->and($tenantModel)->toContain("return \$this->primary_domain ?? (string) \$this->getKey();")
+        ->and($tenantModel)->toContain('return $this->primary_domain ?? (string) $this->getKey();')
         ->and($tenantModel)->not->toContain('getCustomColumns')
         ->and($tenantController)->toContain("return redirect()->route('core-panel.users.index', ['tab' => 'tenants']);")
         ->and($tenantController)->toContain('public function dtApi(): JsonResponse')
@@ -806,7 +806,7 @@ it('refreshes tenancy publish tags through the addon provider for in-place updat
         ->and($command)->toContain('handleInertiaRequestsTenancyMerger->merge($basePath);')
         ->and($command)->toContain('App\\\\Providers\\\\TenancyServiceProvider::class')
         ->and($command)->toContain('use App\\\\Providers\\\\TenancyServiceProvider;')
-        ->and($command)->toContain("TenancyServiceProvider::class");
+        ->and($command)->toContain('TenancyServiceProvider::class');
 });
 
 it('normalizes bootstrap providers to the imported tenancy provider style during updates', function (): void {
@@ -836,5 +836,141 @@ PHP);
 
     expect($providers)->toContain('use App\\Providers\\TenancyServiceProvider;')
         ->and($providers)->toContain('TenancyServiceProvider::class,')
-        ->and($providers)->not->toContain("    App\\Providers\\TenancyServiceProvider::class,");
+        ->and($providers)->not->toContain('    App\\Providers\\TenancyServiceProvider::class,');
+});
+
+it('normalizes bootstrap providers with CRLF line endings before shortening the tenancy provider class', function (): void {
+    $basePath = makeTenancyUpdateBasePath('normalize-tenancy-provider-import-crlf');
+
+    mkdir($basePath.'/bootstrap', 0777, true);
+
+    file_put_contents($basePath.'/bootstrap/providers.php', implode("\r\n", [
+        '<?php',
+        '',
+        '/* host specific header */',
+        '',
+        'return [',
+        '    App\Providers\AppServiceProvider::class,',
+        '    App\Providers\TenancyServiceProvider::class,',
+        '];',
+        '',
+    ]));
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $providers = file_get_contents($basePath.'/bootstrap/providers.php');
+
+    expect($providers)->toContain("use App\\Providers\\TenancyServiceProvider;\r\n")
+        ->and($providers)->toContain('TenancyServiceProvider::class,')
+        ->and($providers)->not->toContain('    App\\Providers\\TenancyServiceProvider::class,')
+        ->and($providers)->toContain("\r\nreturn [");
+});
+
+it('does not prepend a duplicate tenancy provider import when one already exists with an inline comment', function (): void {
+    $basePath = makeTenancyUpdateBasePath('preserve-commented-tenancy-provider-import');
+
+    mkdir($basePath.'/bootstrap', 0777, true);
+    file_put_contents($basePath.'/bootstrap/providers.php', <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+use App\Providers\AppServiceProvider;
+use App\Providers\TenancyServiceProvider; // host note
+
+return [
+    AppServiceProvider::class,
+    TenancyServiceProvider::class,
+];
+PHP);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $providers = file_get_contents($basePath.'/bootstrap/providers.php');
+
+    expect(substr_count($providers, 'use App\\Providers\\TenancyServiceProvider;'))->toBe(1)
+        ->and($providers)->toContain('use App\\Providers\\TenancyServiceProvider; // host note')
+        ->and($providers)->toContain('TenancyServiceProvider::class,');
+});
+
+it('registers the tenancy provider when the short class reference only appears in a comment', function (): void {
+    $basePath = makeTenancyUpdateBasePath('register-comment-only-tenancy-provider-reference');
+
+    mkdir($basePath.'/bootstrap', 0777, true);
+    file_put_contents($basePath.'/bootstrap/providers.php', <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+use App\Providers\AppServiceProvider;
+
+// TenancyServiceProvider::class is documented here for host notes.
+return [
+    AppServiceProvider::class,
+];
+PHP);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $providers = file_get_contents($basePath.'/bootstrap/providers.php');
+
+    expect(substr_count($providers, 'TenancyServiceProvider::class'))->toBe(2)
+        ->and($providers)->toContain('// TenancyServiceProvider::class is documented here for host notes.')
+        ->and($providers)->toContain('use App\\Providers\\TenancyServiceProvider;')
+        ->and($providers)->toContain("    TenancyServiceProvider::class,\n];");
+});
+
+it('does not append a duplicate tenancy provider when it is already registered inline', function (): void {
+    $basePath = makeTenancyUpdateBasePath('preserve-inline-tenancy-provider-registration');
+
+    mkdir($basePath.'/bootstrap', 0777, true);
+    file_put_contents($basePath.'/bootstrap/providers.php', <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+return [App\Providers\TenancyServiceProvider::class];
+PHP);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $providers = file_get_contents($basePath.'/bootstrap/providers.php');
+
+    expect(substr_count($providers, 'TenancyServiceProvider::class'))->toBe(1)
+        ->and($providers)->toContain('use App\\Providers\\TenancyServiceProvider;')
+        ->and($providers)->toContain('return [TenancyServiceProvider::class];')
+        ->and($providers)->not->toContain("TenancyServiceProvider::class,\n    TenancyServiceProvider::class,");
+});
+
+it('does not append a duplicate tenancy provider when it is already registered inline with a root-qualified class', function (): void {
+    $basePath = makeTenancyUpdateBasePath('preserve-inline-root-qualified-tenancy-provider-registration');
+
+    mkdir($basePath.'/bootstrap', 0777, true);
+    file_put_contents($basePath.'/bootstrap/providers.php', <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+return [\App\Providers\TenancyServiceProvider::class];
+PHP);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+    ])->assertExitCode(0);
+
+    $providers = file_get_contents($basePath.'/bootstrap/providers.php');
+
+    expect(substr_count($providers, 'TenancyServiceProvider::class'))->toBe(1)
+        ->and($providers)->toContain('use App\\Providers\\TenancyServiceProvider;')
+        ->and($providers)->toContain('return [TenancyServiceProvider::class];')
+        ->and($providers)->not->toContain('\App\\Providers\\TenancyServiceProvider::class')
+        ->and($providers)->not->toContain("TenancyServiceProvider::class,\n    TenancyServiceProvider::class,");
 });
