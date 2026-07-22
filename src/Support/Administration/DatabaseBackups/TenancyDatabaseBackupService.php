@@ -256,7 +256,7 @@ final class TenancyDatabaseBackupService
             foreach ($this->tenancy->tenants() as $tenant) {
                 $tenantId = $this->tenancy->tenantId($tenant);
                 $tenantLabel = $this->tenancy->tenantLabel($tenant);
-                $relativePath = 'tenants/'.$this->sanitizeSegment($tenantId).'.dump';
+                $relativePath = $this->tenantDumpRelativePath($tenantId);
                 $sqlRelativePath = str_replace('.dump', '.sql', $relativePath);
                 $absolutePath = $workspace.'/'.$relativePath;
                 $sqlAbsolutePath = $workspace.'/'.$sqlRelativePath;
@@ -474,6 +474,15 @@ final class TenancyDatabaseBackupService
         $name = $this->makeSetName('imported');
 
         return $encrypted ? $name.'.enc' : $name;
+    }
+
+    private function tenantDumpRelativePath(string $tenantId): string
+    {
+        return sprintf(
+            'tenants/%s-%s.dump',
+            $this->sanitizeSegment($tenantId),
+            hash('sha256', $tenantId),
+        );
     }
 
     private function sanitizeSegment(string $value): string

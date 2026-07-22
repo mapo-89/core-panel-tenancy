@@ -90,6 +90,19 @@ it('binds the administration area to tenancy-specific backup services', function
         ->toBe('full_set');
 });
 
+it('uses distinct archive paths for tenant IDs with the same sanitized segment', function (): void {
+    $service = app(TenancyDatabaseBackupService::class);
+    $method = new ReflectionMethod($service, 'tenantDumpRelativePath');
+    $method->setAccessible(true);
+
+    $slashIdPath = $method->invoke($service, 'acme/eu');
+    $dashIdPath = $method->invoke($service, 'acme-eu');
+
+    expect($slashIdPath)->toBe('tenants/acme-eu-'.hash('sha256', 'acme/eu').'.dump')
+        ->and($dashIdPath)->toBe('tenants/acme-eu-'.hash('sha256', 'acme-eu').'.dump')
+        ->and($slashIdPath)->not->toBe($dashIdPath);
+});
+
 it('shows the content scope column by default in the administration backup table state', function (): void {
     $user = FakeUser::query()->create([
         'email' => 'table@example.test',
