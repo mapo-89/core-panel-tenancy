@@ -4,11 +4,21 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy;
 
+use CorePanel\Console\RunAutomaticDatabaseBackupCommand;
 use CorePanel\Contracts\SettingsLogoUrlGenerator;
+use CorePanel\Http\Controllers\Administration\AdministrationController;
+use CorePanel\Http\Controllers\Administration\DatabaseBackupController;
 use CorePanelTenancy\Console\ConvertTimestampsToTimestamptzCommand;
 use CorePanelTenancy\Console\InstallTenancyCommand;
+use CorePanelTenancy\Console\TenancyRunAutomaticDatabaseBackupCommand;
 use CorePanelTenancy\Console\UpdateTenancyCommand;
 use CorePanelTenancy\Domains\Tenancy\Policies\TenantPolicy;
+use CorePanelTenancy\Http\Controllers\Administration\TenancyAdministrationController;
+use CorePanelTenancy\Http\Controllers\Administration\TenancyDatabaseBackupController;
+use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupRestoreService;
+use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupService;
+use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupSettings;
+use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupTenancySupport;
 use CorePanelTenancy\Support\Media\TenantAwareUrlGenerator;
 use CorePanelTenancy\Support\Settings\TenantAwareSettingsLogoUrlGenerator;
 use CorePanelTenancy\Support\Tenancy\TenantSwitcher;
@@ -29,6 +39,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         $this->mergeTimestampTzConversionConfig();
         $this->mergeFortifyMiddlewareConfig();
         $this->configureMediaLibraryForTenancy();
+        $this->bindTenancyDatabaseBackups();
         $this->app->bind(SettingsLogoUrlGenerator::class, TenantAwareSettingsLogoUrlGenerator::class);
     }
 
@@ -86,6 +97,10 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
 
         $this->publishes([
             __DIR__.'/../resources/js/components/Users/UserTenantsTab.vue' => resource_path('js/components/Users/UserTenantsTab.vue'),
+            __DIR__.'/../resources/js/pages/Admin/Administration/Index.vue' => resource_path('js/pages/Admin/Administration/Index.vue'),
+            __DIR__.'/../resources/js/pages/Admin/Administration/components/DatabaseBackupsTab.vue' => resource_path('js/pages/Admin/Administration/components/DatabaseBackupsTab.vue'),
+            __DIR__.'/../resources/js/pages/Admin/Administration/components/DatabaseBackupRestoreDialog.vue' => resource_path('js/pages/Admin/Administration/components/DatabaseBackupRestoreDialog.vue'),
+            __DIR__.'/../resources/js/pages/Admin/Administration/components/DatabaseBackupSettingsDialog.vue' => resource_path('js/pages/Admin/Administration/components/DatabaseBackupSettingsDialog.vue'),
             __DIR__.'/../resources/js/pages/Admin/Tenants/Edit.vue' => resource_path('js/pages/Admin/Tenants/Edit.vue'),
             __DIR__.'/../resources/js/pages/Admin/Tenants/components/TenantForm.vue' => resource_path('js/pages/Admin/Tenants/components/TenantForm.vue'),
             __DIR__.'/../resources/js/pages/Admin/Users/Index.vue' => resource_path('js/pages/Admin/Users/Index.vue'),
@@ -303,6 +318,17 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         $databaseConfig['timestamp_tz_conversion'] = $conversionConfig;
 
         config()->set('core-panel.database', $databaseConfig);
+    }
+
+    private function bindTenancyDatabaseBackups(): void
+    {
+        $this->app->singleton(TenancyDatabaseBackupTenancySupport::class);
+        $this->app->singleton(TenancyDatabaseBackupSettings::class);
+        $this->app->singleton(TenancyDatabaseBackupService::class);
+        $this->app->singleton(TenancyDatabaseBackupRestoreService::class);
+        $this->app->singleton(AdministrationController::class, TenancyAdministrationController::class);
+        $this->app->singleton(DatabaseBackupController::class, TenancyDatabaseBackupController::class);
+        $this->app->singleton(RunAutomaticDatabaseBackupCommand::class, TenancyRunAutomaticDatabaseBackupCommand::class);
     }
 
     private function shareTenancyContext(): void

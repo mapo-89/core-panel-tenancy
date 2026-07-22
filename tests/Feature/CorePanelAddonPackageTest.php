@@ -8,6 +8,9 @@ use CorePanelTenancy\Console\InstallTenancyCommand;
 use CorePanelTenancy\Console\UpdateTenancyCommand;
 use CorePanelTenancy\CorePanelTenancyServiceProvider;
 use CorePanelTenancy\Support\Install\HandleInertiaRequestsTenancyMerger;
+use CorePanelTenancy\Support\Install\InertiaPageResolverTenancyMerger;
+use CorePanelTenancy\Support\Install\TenancyAdministrationPageMigrator;
+use CorePanelTenancy\Support\Install\ViteConfigTenancyMerger;
 use CorePanelTenancy\Support\Media\TenantAwareUrlGenerator;
 use CorePanelTenancy\Support\Settings\TenantAwareSettingsLogoUrlGenerator;
 use CorePanelTenancy\Support\Tenancy\CentralImpersonationContext;
@@ -66,6 +69,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $tenantCentralRouteFile = file_get_contents(__DIR__.'/../../routes/web/tenants.php');
     $tenantSettingsRouteFile = file_get_contents(__DIR__.'/../../routes/web/admin/settings.php');
     $tenantUsersOverride = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Users/Index.vue');
+    $tenantIndexPage = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Tenants/Index.vue');
     $tenantEditPage = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Tenants/Edit.vue');
     $tenantTab = file_get_contents(__DIR__.'/../../resources/js/components/Users/UserTenantsTab.vue');
     $tenantForm = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Tenants/components/TenantForm.vue');
@@ -124,15 +128,20 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($installCommand)->toContain('core-panel-tenancy-config')
         ->and($installCommand)->toContain('core-panel-tenancy-migrations')
         ->and($installCommand)->toContain('core-panel-tenancy-lang-vendor')
+        ->and($installCommand)->not->toContain("'core-panel-tenancy-ui'")
         ->and($installCommand)->toContain('CorePanelPublisher::class')
         ->and($installCommand)->toContain('publishForProvider(')
         ->and($installCommand)->not->toContain("\$this->call('vendor:publish'")
         ->and($installCommand)->toContain('AppServiceProviderTenancyMerger')
         ->and($installCommand)->toContain('CorePanelTypesTenancyMerger')
         ->and($installCommand)->toContain('HandleInertiaRequestsTenancyMerger')
+        ->and($installCommand)->toContain('InertiaPageResolverTenancyMerger')
+        ->and($installCommand)->toContain('TenancyAdministrationPageMigrator')
+        ->and($installCommand)->toContain('ViteConfigTenancyMerger')
         ->and($installCommand)->toContain('appServiceProviderTenancyMerger->merge();')
         ->and($installCommand)->toContain('corePanelTypesTenancyMerger->merge();')
         ->and($installCommand)->toContain('handleInertiaRequestsTenancyMerger->merge();')
+        ->and($installCommand)->toContain('administrationPageMigrator->migrate();')
         ->and($installCommand)->toContain("database_path('migrations/2026_01_01_000021_add_data_column_to_existing_tenants_table.php')")
         ->and($installCommand)->toContain("resource_path('js/routes/core-panel/tenants.ts')")
         ->and($installCommand)->toContain("'CENTRAL_DOMAINS' =>")
@@ -172,6 +181,16 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantUsersOverride)->toContain('resyncManagedRoles')
         ->and($tenantUsersOverride)->toContain("'assignableRoles'")
         ->and($tenantUsersOverride)->toContain("'canAssignRoles'")
+        ->and($tenantUsersOverride)->toContain("from '@core-panel-tenancy/components/Users/UserTenantsTab.vue'")
+        ->and($tenantUsersOverride)->toContain("from '@core-panel-tenancy/pages/Admin/Tenants/components/TenantForm.vue'")
+        ->and($tenantUsersOverride)->not->toContain("from '@/components/")
+        ->and($tenantUsersOverride)->not->toContain("from '@/pages/")
+        ->and($tenantIndexPage)->toContain("from '@core-panel-tenancy/components/Users/UserTenantsTab.vue'")
+        ->and($tenantIndexPage)->toContain("from '@core-panel-tenancy/pages/Admin/Tenants/components/TenantForm.vue'")
+        ->and($tenantEditPage)->toContain("from '@core-panel-tenancy/pages/Admin/Tenants/components/TenantForm.vue'")
+        ->and($tenantTab)->toContain("from '@core-panel-tenancy/pages/Admin/Tenants/components/TenantForm.vue'")
+        ->and($tenantForm)->not->toContain("from '@/components/")
+        ->and($tenantForm)->not->toContain("from '@/pages/")
         ->and($appServiceProviderTenancyMerger)->toContain('stubs/app/Providers/AppServiceProvider.php')
         ->and($appServiceProviderTenancyMerger)->toContain('stubs/merge/app-service-provider.tenancy-hook.stub')
         ->and($handleInertiaRequestsTenancyMerger)->toContain('app/Http/Middleware/HandleInertiaRequests.php')
@@ -179,6 +198,8 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($handleInertiaRequestsTenancyMerger)->toContain("'tenant_switcher' => fn (): ?array =>")
         ->and($handleInertiaRequestsTenancyMerger)->toContain('app(\\\\CorePanelTenancy\\\\Support\\\\Tenancy\\\\TenantSwitcher::class)->forRequest(\$request)')
         ->and($handleInertiaRequestsTenancyMerger)->toContain('forRequest(\$request)')
+        ->and($installCommand)->toContain('inertiaPageResolverTenancyMerger->merge();')
+        ->and($installCommand)->toContain('viteConfigTenancyMerger->merge();')
         ->and($appServiceProviderTenancyHook)->toContain('Vite::createAssetPathsUsing(')
         ->and($appServiceProviderTenancyHook)->toContain('CommandFinished $event')
         ->and($corePanelTypesTenancyMerger)->toContain('stubs/merge/core-panel-tenancy-context.stub')
@@ -235,11 +256,11 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($addonTypesAwareUsersIndex)->toContain('CorePanelTenancyContext')
         ->and($tenantUsersOverride)->toContain('const canManageTenants = computed(')
         ->and($tenantUsersOverride)->toContain('page.props.tenancy?.isCentral === true')
-        ->and($tenantUsersOverride)->toContain("import UserTenantsTab from '@/components/Users/UserTenantsTab.vue'")
+        ->and($tenantUsersOverride)->toContain("import UserTenantsTab from '@core-panel-tenancy/components/Users/UserTenantsTab.vue'")
         ->and($tenantTab)->toContain("import { useDateTime } from '@core-panel/composables/useDateTime'")
         ->and($tenantTab)->toContain('const { formatDateTime } = useDateTime()')
         ->and($tenantTab)->toContain('formatDateTime(String(row.created_at))')
-        ->and($tenantEditPage)->toContain("import TenantForm from '@/pages/Admin/Tenants/components/TenantForm.vue'")
+        ->and($tenantEditPage)->toContain("import TenantForm from '@core-panel-tenancy/pages/Admin/Tenants/components/TenantForm.vue'")
         ->and($tenantTab)->toContain('destroy as destroyTenant')
         ->and($tenantTab)->toContain('dtApi as tenantDtApi')
         ->and($tenantTab)->toContain('impersonate as impersonateTenant')
@@ -377,6 +398,93 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantRolePermissionSeeder)->toContain("unset(\$tenantAccess['resources']['tenants']);")
         ->and($upsertTenantSuperAdminAction)->toContain("if (in_array('mobile', \$userColumns, true))")
         ->and($upsertTenantSuperAdminAction)->toContain("\$attributes['requires_password_setup'] = false;");
+});
+
+it('keeps package-internal tenancy Vue imports independent from host aliases', function (): void {
+    $root = __DIR__.'/../../resources/js';
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
+    );
+
+    foreach ($iterator as $file) {
+        if (! $file->isFile() || $file->getExtension() !== 'vue') {
+            continue;
+        }
+
+        $contents = (string) file_get_contents($file->getPathname());
+
+        expect($contents)->not->toMatch("/from ['\"]@\\/(?:components|pages)\\//");
+        expect($contents)->not->toMatch("/from ['\"](?:\\.\\.?\\/).*\\.vue['\"]/");
+    }
+});
+
+it('shows a loading indicator while creating a full tenancy backup', function (): void {
+    $databaseBackups = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Administration/components/DatabaseBackupsTab.vue');
+
+    expect($databaseBackups)->toContain('v-model:visible="createBackupDialogVisible"')
+        ->and($databaseBackups)->toContain('v-if="createBackupProcessing"')
+        ->and($databaseBackups)->toContain('name="refresh-cw"')
+        ->and($databaseBackups)->toContain('class="cp-icon animate-spin"')
+        ->and($databaseBackups)->toContain('@click="submitCreateBackup(selectedCreateScope)"');
+});
+
+it('allows backup set archives in the tenancy backup import dialog', function (): void {
+    $databaseBackups = file_get_contents(__DIR__.'/../../resources/js/pages/Admin/Administration/components/DatabaseBackupsTab.vue');
+
+    expect($databaseBackups)->toContain('accept=".dump,.dump.enc,.zip,.zip.enc"');
+});
+
+it('includes SQL exports for every database in tenancy backup sets', function (): void {
+    $backupService = file_get_contents(__DIR__.'/../../src/Support/Administration/DatabaseBackups/TenancyDatabaseBackupService.php');
+
+    expect($backupService)->toContain("'sql_file' => 'central.sql'")
+        ->and($backupService)->toContain("str_replace('.dump', '.sql', \$relativePath)")
+        ->and($backupService)->toContain("\$zip->addFile(\$workspace.'/central.sql', 'central.sql');")
+        ->and($backupService)->toContain("\$zip->addFile(\$workspace.'/'.\$tenantEntry['sql_file'], \$tenantEntry['sql_file']);")
+        ->and($backupService)->toContain("'pg_restore'")
+        ->and($backupService)->toContain("'sqlite3'");
+});
+
+it('adds tenancy page resolution only when the tenancy addon is installed', function (): void {
+    $basePath = makeTenancyUpdateBasePath('inertia-page-resolution');
+    $appPath = $basePath.'/resources/js/app.ts';
+    $corePanelStub = __DIR__.'/../../../core-panel/stubs/resources/js/app.ts';
+
+    mkdir(dirname($appPath), 0777, true);
+    copy($corePanelStub, $appPath);
+
+    app(InertiaPageResolverTenancyMerger::class)->merge($basePath);
+
+    $contents = (string) file_get_contents($appPath);
+
+    expect($contents)->toContain('const tenancyPageModules = import.meta.glob<{ default: DefineComponent }>(')
+        ->and($contents)->toContain('../../vendor/mapo-89/core-panel-tenancy/resources/js/pages/**/*.vue')
+        ->and($contents)->toContain('return tenancyPage')
+        ->and(strpos($contents, 'return hostPage.default'))->toBeLessThan(
+            strpos($contents, 'return tenancyPage'),
+        )->and(strpos($contents, 'return tenancyPage'))->toBeLessThan(
+            strpos($contents, 'return vendorPage'),
+        );
+});
+
+it('adds the tenancy import alias only when the tenancy addon is installed', function (): void {
+    $basePath = makeTenancyUpdateBasePath('vite-config');
+    $viteConfigPath = $basePath.'/vite.config.ts';
+    $corePanelStub = __DIR__.'/../../../core-panel/stubs/vite.config.ts';
+
+    mkdir($basePath, 0777, true);
+    copy($corePanelStub, $viteConfigPath);
+
+    app(ViteConfigTenancyMerger::class)->merge($basePath);
+
+    $contents = (string) file_get_contents($viteConfigPath);
+
+    expect($contents)->toContain('const tenancyPackageJsPath = path.resolve(')
+        ->and($contents)->toContain('vendor/mapo-89/core-panel-tenancy/resources/js')
+        ->and($contents)->toContain('function resolveCorePanelTenancyImport(importee: string): string | null {')
+        ->and($contents)->toContain("importee.startsWith('@core-panel-tenancy/')")
+        ->and($contents)->toContain('resolveCorePanelTenancyImport(importee) ??')
+        ->and($contents)->toContain('resolveCorePanelImport(importee)');
 });
 
 it('configures Media Library to use the tenant-aware URL generator when the addon is loaded', function (): void {
@@ -535,7 +643,7 @@ it('runs tenancy update command in dry-run', function (): void {
     ])->assertExitCode(0);
 });
 
-it('limits tenancy update dry-runs to tenancy provider tags', function (): void {
+it('only reports the CorePanel administration page migration alongside tenancy update tags', function (): void {
     Artisan::call('core-panel:tenancy:update', [
         '--dry-run' => true,
         '--force' => true,
@@ -545,10 +653,69 @@ it('limits tenancy update dry-runs to tenancy provider tags', function (): void 
     $output = Artisan::output();
 
     expect($output)->toContain('core-panel-tenancy-core')
-        ->and($output)->not->toContain('core-panel-components')
+        ->and($output)->toContain('core-panel-components')
         ->and($output)->not->toContain('core-panel-theme')
         ->and($output)->not->toContain('core-panel-lang')
         ->and($output)->not->toContain('core-panel-views');
+});
+
+it('removes an unchanged CorePanel administration page so the tenancy vendor page resolves', function (): void {
+    $basePath = makeTenancyUpdateBasePath('vendor-first-administration-page');
+    $target = $basePath.'/resources/js/pages/Admin/Administration/Index.vue';
+    $source = __DIR__.'/../../../core-panel/resources/js/pages/Admin/Administration/Index.vue';
+    $contents = (string) file_get_contents($source);
+    $manifestPath = $basePath.'/storage/app/core-panel/published.json';
+
+    mkdir(dirname($target), 0777, true);
+    mkdir(dirname($manifestPath), 0777, true);
+    file_put_contents($target, $contents);
+    file_put_contents($manifestPath, json_encode([
+        'files' => [
+            $target => [
+                'tag' => 'core-panel-components',
+                'source' => $source,
+                'source_hash' => md5($contents),
+                'destination_hash' => md5($contents),
+                'published_at' => now()->subDay()->toAtomString(),
+            ],
+        ],
+    ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)."\n");
+
+    $change = app(TenancyAdministrationPageMigrator::class)->migrate($basePath);
+    $manifest = readTenancyPublishManifest($basePath);
+
+    expect($change['status'])->toBe('delete')
+        ->and(file_exists($target))->toBeFalse()
+        ->and($manifest['files'][$target] ?? null)->toBeNull();
+});
+
+it('keeps a customized host administration page as an explicit tenancy override', function (): void {
+    $basePath = makeTenancyUpdateBasePath('vendor-first-administration-override');
+    $target = $basePath.'/resources/js/pages/Admin/Administration/Index.vue';
+    $source = __DIR__.'/../../../core-panel/resources/js/pages/Admin/Administration/Index.vue';
+    $sourceContents = (string) file_get_contents($source);
+    $hostContents = $sourceContents."\n<!-- host customization -->\n";
+    $manifestPath = $basePath.'/storage/app/core-panel/published.json';
+
+    mkdir(dirname($target), 0777, true);
+    mkdir(dirname($manifestPath), 0777, true);
+    file_put_contents($target, $hostContents);
+    file_put_contents($manifestPath, json_encode([
+        'files' => [
+            $target => [
+                'tag' => 'core-panel-components',
+                'source' => $source,
+                'source_hash' => md5($sourceContents),
+                'destination_hash' => md5($sourceContents),
+                'published_at' => now()->subDay()->toAtomString(),
+            ],
+        ],
+    ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)."\n");
+
+    $change = app(TenancyAdministrationPageMigrator::class)->migrate($basePath);
+
+    expect($change['status'])->toBe('kept')
+        ->and(file_get_contents($target))->toBe($hostContents);
 });
 
 it('does not create published snapshots during tenancy update dry-runs for legacy manifest entries', function (): void {
@@ -587,10 +754,9 @@ it('does not create published snapshots during tenancy update dry-runs for legac
         ->and(file_exists($basePath.'/storage/app/core-panel/published'))->toBeFalse();
 });
 
-it('adopts legacy tenancy publishes into the manifest during force updates', function (): void {
+it('leaves legacy tenancy UI publishes as host overrides during force updates', function (): void {
     $basePath = makeTenancyUpdateBasePath('legacy-adopt');
     $target = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
-    $source = __DIR__.'/../../resources/js/pages/Admin/Users/Index.vue';
 
     mkdir(dirname($target), 0777, true);
     file_put_contents($target, "<template>\n    <div>legacy tenancy users</div>\n</template>\n");
@@ -600,18 +766,14 @@ it('adopts legacy tenancy publishes into the manifest during force updates', fun
         '--base-path' => $basePath,
     ])->assertExitCode(0);
 
-    $manifest = readTenancyPublishManifest($basePath);
     $backups = glob($basePath.'/.core-panel-backups/*/resources/js/pages/Admin/Users/Index.vue');
 
-    expect(file_get_contents($target))->toBe(file_get_contents($source))
-        ->and($manifest['files'][$target] ?? null)->toBeArray()
-        ->and($manifest['files'][$target]['tag'] ?? null)->toBe('core-panel-tenancy-ui')
+    expect(file_get_contents($target))->toContain('legacy tenancy users')
         ->and($backups)->not->toBeFalse()
-        ->and($backups)->not->toBeEmpty()
-        ->and(file_get_contents($backups[0]))->toContain('legacy tenancy users');
+        ->and($backups)->toBeEmpty();
 });
 
-it('merges upstream changes into managed tenancy publishes with local modifications during updates', function (): void {
+it('leaves managed legacy tenancy UI overrides untouched during updates', function (): void {
     $basePath = makeTenancyUpdateBasePath('managed-published-merge');
     $sourcePath = __DIR__.'/../../resources/js/pages/Admin/Users/Index.vue';
     $originalSourceContents = (string) file_get_contents($sourcePath);
@@ -631,8 +793,8 @@ it('merges upstream changes into managed tenancy publishes with local modificati
         file_put_contents(
             $target,
             str_replace(
-                "import UserTenantsTab from '@/components/Users/UserTenantsTab.vue'\n",
-                "import UserTenantsTab from '@/components/Users/UserTenantsTab.vue'\nconst localHostCustomization = true\n",
+                "import UserTenantsTab from '@core-panel-tenancy/components/Users/UserTenantsTab.vue'\n",
+                "import UserTenantsTab from '@core-panel-tenancy/components/Users/UserTenantsTab.vue'\nconst localHostCustomization = true\n",
                 $targetContents,
             ),
         );
@@ -655,17 +817,16 @@ it('merges upstream changes into managed tenancy publishes with local modificati
 
         expect($updatedTargetContents)
             ->toContain('const localHostCustomization = true')
-            ->and($updatedTargetContents)->toContain('const upstreamPackageChange = true')
+            ->and($updatedTargetContents)->not->toContain('const upstreamPackageChange = true')
             ->and($manifest['files'][$target]['snapshot'] ?? null)->toBeString();
     } finally {
         file_put_contents($sourcePath, $originalSourceContents);
     }
 });
 
-it('leaves core vendor-first assets unmanaged when updating tenancy user overrides directly', function (): void {
+it('leaves host Vue overrides and CorePanel vendor-first assets unmanaged during tenancy updates', function (): void {
     $basePath = makeTenancyUpdateBasePath('core-types-sync');
     $tenantUsersTarget = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
-    $tenantUsersSource = __DIR__.'/../../resources/js/pages/Admin/Users/Index.vue';
     $coreDataTableTarget = $basePath.'/resources/js/components/TableBuilder/DataTable.vue';
     $coreUseDataTableTarget = $basePath.'/resources/js/components/TableBuilder/useDataTable.ts';
     $coreTypesTarget = $basePath.'/resources/js/types/core-panel.ts';
@@ -693,7 +854,7 @@ it('leaves core vendor-first assets unmanaged when updating tenancy user overrid
     $useDataTableBackups = glob($basePath.'/.core-panel-backups/*/resources/js/components/TableBuilder/useDataTable.ts');
     $typeBackups = glob($basePath.'/.core-panel-backups/*/resources/js/types/core-panel.ts');
 
-    expect(file_get_contents($tenantUsersTarget))->toBe(file_get_contents($tenantUsersSource))
+    expect(file_get_contents($tenantUsersTarget))->toContain('legacy tenancy users')
         ->and(file_get_contents($coreDataTableTarget))->toContain('const legacyTable = true')
         ->and(file_get_contents($coreUseDataTableTarget))->toContain('return { rows: schema.rows }')
         ->and(file_get_contents($coreTypesTarget))->toContain('id: string')
@@ -708,7 +869,7 @@ it('leaves core vendor-first assets unmanaged when updating tenancy user overrid
         ->and($typeBackups)->toBeEmpty();
 });
 
-it('reports legacy tenancy publishes as conflicts without force', function (): void {
+it('does not report legacy tenancy UI overrides as conflicts without force', function (): void {
     $basePath = makeTenancyUpdateBasePath('legacy-conflict');
     $target = $basePath.'/resources/js/pages/Admin/Users/Index.vue';
 
@@ -717,7 +878,7 @@ it('reports legacy tenancy publishes as conflicts without force', function (): v
 
     $this->artisan('core-panel:tenancy:update', [
         '--base-path' => $basePath,
-    ])->assertExitCode(1);
+    ])->assertExitCode(0);
 
     expect(file_get_contents($target))->toContain('legacy tenancy users')
         ->and(file_exists($basePath.'/storage/app/core-panel/published.json'))->toBeTrue();
@@ -798,12 +959,16 @@ it('refreshes tenancy publish tags through the addon provider for in-place updat
 
     expect($command)->toContain('CorePanelTenancyServiceProvider::class')
         ->and($command)->toContain('adoptUnmanagedExisting: true')
+        ->and($command)->not->toContain("'core-panel-tenancy-ui'")
         ->and($command)->toContain('managedMissingPaths: $this->resolveRequiredUpdatePaths($basePath)')
         ->and($command)->toContain("'database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php'")
         ->and($command)->not->toContain('publishProviderTag(CorePanelTenancyServiceProvider::class, $tag, $force);')
         ->and($command)->toContain('if ($basePath === null) {')
         ->and($command)->toContain('ensureTenancyProviderRegistered($basePath);')
         ->and($command)->toContain('handleInertiaRequestsTenancyMerger->merge($basePath);')
+        ->and($command)->toContain('inertiaPageResolverTenancyMerger->merge($basePath);')
+        ->and($command)->toContain('administrationPageMigrator->migrate($basePath, $dryRun);')
+        ->and($command)->toContain('viteConfigTenancyMerger->merge($basePath);')
         ->and($command)->toContain('App\\\\Providers\\\\TenancyServiceProvider::class')
         ->and($command)->toContain('use App\\\\Providers\\\\TenancyServiceProvider;')
         ->and($command)->toContain('TenancyServiceProvider::class');

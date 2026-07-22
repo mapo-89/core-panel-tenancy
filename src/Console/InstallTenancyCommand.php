@@ -11,6 +11,9 @@ use CorePanelTenancy\CorePanelTenancyServiceProvider;
 use CorePanelTenancy\Support\Install\AppServiceProviderTenancyMerger;
 use CorePanelTenancy\Support\Install\CorePanelTypesTenancyMerger;
 use CorePanelTenancy\Support\Install\HandleInertiaRequestsTenancyMerger;
+use CorePanelTenancy\Support\Install\InertiaPageResolverTenancyMerger;
+use CorePanelTenancy\Support\Install\TenancyAdministrationPageMigrator;
+use CorePanelTenancy\Support\Install\ViteConfigTenancyMerger;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 
@@ -25,7 +28,6 @@ final class InstallTenancyCommand extends Command
         'core-panel-tenancy-migrations',
         'core-panel-tenancy-lang',
         'core-panel-tenancy-lang-vendor',
-        'core-panel-tenancy-ui',
     ];
 
     protected $signature = 'core-panel:tenancy:install
@@ -41,6 +43,9 @@ final class InstallTenancyCommand extends Command
         private readonly AppServiceProviderTenancyMerger $appServiceProviderTenancyMerger,
         private readonly CorePanelTypesTenancyMerger $corePanelTypesTenancyMerger,
         private readonly HandleInertiaRequestsTenancyMerger $handleInertiaRequestsTenancyMerger,
+        private readonly InertiaPageResolverTenancyMerger $inertiaPageResolverTenancyMerger,
+        private readonly TenancyAdministrationPageMigrator $administrationPageMigrator,
+        private readonly ViteConfigTenancyMerger $viteConfigTenancyMerger,
     ) {
         parent::__construct();
     }
@@ -52,6 +57,9 @@ final class InstallTenancyCommand extends Command
             self::INSTALL_TAGS,
             (bool) $this->option('force'),
         );
+
+        $administrationPageChange = $this->administrationPageMigrator->migrate();
+        $result['changes'][] = $administrationPageChange;
 
         $this->table(
             ['Tag', 'Status', 'Reason', 'Destination'],
@@ -68,11 +76,17 @@ final class InstallTenancyCommand extends Command
 
         $this->components->info('Manifest: '.$result['manifestPath']);
 
+        if ($administrationPageChange['status'] === 'kept') {
+            $this->components->warn('Keeping the host Administration page. It overrides the tenancy backup UI until it is removed or updated by the host application.');
+        }
+
         $this->removeObsoletePublishedFiles();
         $this->ensureTenancyProviderRegistered();
         $this->appServiceProviderTenancyMerger->merge();
         $this->corePanelTypesTenancyMerger->merge();
         $this->handleInertiaRequestsTenancyMerger->merge();
+        $this->inertiaPageResolverTenancyMerger->merge();
+        $this->viteConfigTenancyMerger->merge();
         $this->synchronizeTenancyEnvironment();
 
         if ((bool) $this->option('migrate')) {

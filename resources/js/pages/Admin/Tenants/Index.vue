@@ -5,8 +5,8 @@ import { useDialog } from 'primevue/usedialog'
 import { trans } from 'laravel-vue-i18n'
 
 import AppLayout from '@core-panel/layouts/AppLayout.vue'
-import UserTenantsTab from '@/components/Users/UserTenantsTab.vue'
-import TenantForm from '@/pages/Admin/Tenants/components/TenantForm.vue'
+import UserTenantsTab from '@core-panel-tenancy/components/Users/UserTenantsTab.vue'
+import TenantForm from '@core-panel-tenancy/pages/Admin/Tenants/components/TenantForm.vue'
 import { useCan } from '@core-panel/composables/useCan'
 
 type TenantManagementRecord = {

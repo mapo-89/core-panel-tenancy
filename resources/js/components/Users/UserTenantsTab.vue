@@ -11,7 +11,7 @@ import TableBuilderDataTable from '@core-panel/components/TableBuilder/DataTable
 import type { DataTableSchema } from '@core-panel/components/TableBuilder/types'
 import { useCan } from '@core-panel/composables/useCan'
 import { useDateTime } from '@core-panel/composables/useDateTime'
-import TenantForm from '@/pages/Admin/Tenants/components/TenantForm.vue'
+import TenantForm from '@core-panel-tenancy/pages/Admin/Tenants/components/TenantForm.vue'
 import {
     destroy as destroyTenant,
     dtApi as tenantDtApi,

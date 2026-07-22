@@ -9,6 +9,9 @@ use CorePanel\Support\PublishesCorePanelAssets;
 use CorePanel\Support\Publishing\CorePanelPublisher;
 use CorePanelTenancy\CorePanelTenancyServiceProvider;
 use CorePanelTenancy\Support\Install\HandleInertiaRequestsTenancyMerger;
+use CorePanelTenancy\Support\Install\InertiaPageResolverTenancyMerger;
+use CorePanelTenancy\Support\Install\TenancyAdministrationPageMigrator;
+use CorePanelTenancy\Support\Install\ViteConfigTenancyMerger;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use RecursiveDirectoryIterator;
@@ -27,7 +30,6 @@ final class UpdateTenancyCommand extends Command
         'core-panel-tenancy-migrations',
         'core-panel-tenancy-lang',
         'core-panel-tenancy-lang-vendor',
-        'core-panel-tenancy-ui',
     ];
 
     /**
@@ -49,6 +51,9 @@ final class UpdateTenancyCommand extends Command
         private readonly Filesystem $files,
         private readonly HostMigrationRunner $migrations,
         private readonly HandleInertiaRequestsTenancyMerger $handleInertiaRequestsTenancyMerger,
+        private readonly InertiaPageResolverTenancyMerger $inertiaPageResolverTenancyMerger,
+        private readonly TenancyAdministrationPageMigrator $administrationPageMigrator,
+        private readonly ViteConfigTenancyMerger $viteConfigTenancyMerger,
     ) {
         parent::__construct();
     }
@@ -72,6 +77,9 @@ final class UpdateTenancyCommand extends Command
             recreateManagedMissing: false,
         );
 
+        $administrationPageChange = $this->administrationPageMigrator->migrate($basePath, $dryRun);
+        $result['changes'][] = $administrationPageChange;
+
         $this->table(
             ['Tag', 'Status', 'Reason', 'Destination'],
             array_map(
@@ -86,6 +94,10 @@ final class UpdateTenancyCommand extends Command
         );
 
         $this->components->info('Manifest: '.$result['manifestPath']);
+
+        if (! $dryRun && $administrationPageChange['status'] === 'kept') {
+            $this->components->warn('Keeping the host Administration page. It overrides the tenancy backup UI until it is removed or updated by the host application.');
+        }
 
         if ((bool) $this->option('breaking-changes')) {
             $this->warn('Breaking-change mode acknowledged for tenancy update. Review model/migration changes separately before applying.');
@@ -103,6 +115,8 @@ final class UpdateTenancyCommand extends Command
 
         $this->ensureTenancyProviderRegistered($basePath);
         $this->handleInertiaRequestsTenancyMerger->merge($basePath);
+        $this->inertiaPageResolverTenancyMerger->merge($basePath);
+        $this->viteConfigTenancyMerger->merge($basePath);
 
         if ($basePath === null) {
             $this->migrations->run($this);
