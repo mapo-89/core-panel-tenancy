@@ -12,7 +12,7 @@ use CorePanelTenancy\Console\ConvertTimestampsToTimestamptzCommand;
 use CorePanelTenancy\Console\InstallTenancyCommand;
 use CorePanelTenancy\Console\TenancyRunAutomaticDatabaseBackupCommand;
 use CorePanelTenancy\Console\UpdateTenancyCommand;
-use CorePanelTenancy\Domains\Tenancy\Policies\TenantPolicy;
+use CorePanelTenancy\Domain\Tenancy\Policies\TenantPolicy;
 use CorePanelTenancy\Http\Controllers\Administration\TenancyAdministrationController;
 use CorePanelTenancy\Http\Controllers\Administration\TenancyDatabaseBackupController;
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupRestoreService;

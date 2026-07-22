@@ -60,7 +60,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $tenantController = file_get_contents(__DIR__.'/../../src/Http/Controllers/TenantController.php');
     $storeTenantRequest = file_get_contents(__DIR__.'/../../src/Http/Requests/StoreTenantRequest.php');
     $updateTenantRequest = file_get_contents(__DIR__.'/../../src/Http/Requests/UpdateTenantRequest.php');
-    $upsertTenantSuperAdminAction = file_get_contents(__DIR__.'/../../src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php');
+    $upsertTenantSuperAdminAction = file_get_contents(__DIR__.'/../../src/Domain/Tenancy/Actions/UpsertTenantSuperAdminAction.php');
     $tenantModel = file_get_contents(__DIR__.'/../../stubs/app/Models/Tenant.php');
     $centralRouteFile = file_get_contents(__DIR__.'/../../stubs/routes/central.php');
     $tenancyConfig = file_get_contents(__DIR__.'/../../stubs/config/tenancy.php');
@@ -110,7 +110,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $tenantEnglishTranslations = file_get_contents(__DIR__.'/../../resources/lang/en/page-tenants.php');
     $tenantGermanTenancyTranslations = file_get_contents(__DIR__.'/../../resources/lang/de/tenancy.php');
     $tenantEnglishTenancyTranslations = file_get_contents(__DIR__.'/../../resources/lang/en/tenancy.php');
-    $upsertTenantSuperAdminAction = file_get_contents(__DIR__.'/../../src/Domains/Tenancy/Actions/UpsertTenantSuperAdminAction.php');
+    $upsertTenantSuperAdminAction = file_get_contents(__DIR__.'/../../src/Domain/Tenancy/Actions/UpsertTenantSuperAdminAction.php');
     $tenantSettingsController = file_get_contents(__DIR__.'/../../src/Http/Controllers/SettingsController.php');
 
     expect($readme)->toContain('Read-only split repository')

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace CorePanelTenancy\Domains\Tenancy\Policies;
+namespace CorePanelTenancy\Domain\Tenancy\Policies;
 
 use CorePanel\Support\Permissions\PermissionService;
 use Illuminate\Contracts\Auth\Authenticatable;

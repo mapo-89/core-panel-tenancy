@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace CorePanelTenancy\Domains\Tenancy\Actions;
+namespace CorePanelTenancy\Domain\Tenancy\Actions;
 
 use CorePanelTenancy\Support\TenantModelResolver;
 use Illuminate\Contracts\Auth\Authenticatable;

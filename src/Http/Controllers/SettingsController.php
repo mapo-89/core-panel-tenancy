@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy\Http\Controllers;
 
-use CorePanel\Domains\ApiToken\Actions\ListApiTokensAction;
-use CorePanel\Domains\Setting\Actions\GetSettingsGroupAction;
-use CorePanel\Domains\Setting\Actions\UpdateSettingsGroupAction;
+use CorePanel\Domain\ApiToken\Actions\ListApiTokensAction;
+use CorePanel\Domain\Setting\Actions\GetSettingsGroupAction;
+use CorePanel\Domain\Setting\Actions\UpdateSettingsGroupAction;
 use CorePanel\Http\Requests\UpdateSettingsRequest;
 use CorePanel\Http\Requests\UpdateStyleSettingsRequest;
 use CorePanel\Support\ActivityLog\ActivityLogService;

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace CorePanelTenancy\Http\Controllers;
 
-use CorePanelTenancy\Domains\Tenancy\Actions\DeleteTenantAction;
-use CorePanelTenancy\Domains\Tenancy\Actions\ProvisionTenantAction;
-use CorePanelTenancy\Domains\Tenancy\Actions\UpdateTenantAction;
-use CorePanelTenancy\Domains\Tenancy\Actions\UpsertTenantSuperAdminAction;
+use CorePanelTenancy\Domain\Tenancy\Actions\DeleteTenantAction;
+use CorePanelTenancy\Domain\Tenancy\Actions\ProvisionTenantAction;
+use CorePanelTenancy\Domain\Tenancy\Actions\UpdateTenantAction;
+use CorePanelTenancy\Domain\Tenancy\Actions\UpsertTenantSuperAdminAction;
 use CorePanelTenancy\Http\Requests\StoreTenantRequest;
 use CorePanelTenancy\Http\Requests\UpdateTenantRequest;
 use CorePanelTenancy\Http\Resources\TenantResource;

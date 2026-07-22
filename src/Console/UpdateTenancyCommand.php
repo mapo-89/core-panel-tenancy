@@ -11,6 +11,7 @@ use CorePanelTenancy\CorePanelTenancyServiceProvider;
 use CorePanelTenancy\Support\Install\HandleInertiaRequestsTenancyMerger;
 use CorePanelTenancy\Support\Install\InertiaPageResolverTenancyMerger;
 use CorePanelTenancy\Support\Install\TenancyAdministrationPageMigrator;
+use CorePanelTenancy\Support\Install\TenancyTsConfigMerger;
 use CorePanelTenancy\Support\Install\ViteConfigTenancyMerger;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
@@ -53,6 +54,7 @@ final class UpdateTenancyCommand extends Command
         private readonly HandleInertiaRequestsTenancyMerger $handleInertiaRequestsTenancyMerger,
         private readonly InertiaPageResolverTenancyMerger $inertiaPageResolverTenancyMerger,
         private readonly TenancyAdministrationPageMigrator $administrationPageMigrator,
+        private readonly TenancyTsConfigMerger $tsConfigMerger,
         private readonly ViteConfigTenancyMerger $viteConfigTenancyMerger,
     ) {
         parent::__construct();
@@ -116,6 +118,7 @@ final class UpdateTenancyCommand extends Command
         $this->ensureTenancyProviderRegistered($basePath);
         $this->handleInertiaRequestsTenancyMerger->merge($basePath);
         $this->inertiaPageResolverTenancyMerger->merge($basePath);
+        $this->tsConfigMerger->merge($basePath);
         $this->viteConfigTenancyMerger->merge($basePath);
 
         if ($basePath === null) {
