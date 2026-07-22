@@ -105,6 +105,7 @@ final class TenancyDatabaseBackupController extends Controller
             'backup' => [
                 'required',
                 'file',
+                'max:'.max(1, (int) config('core-panel.administration.database_backups.import_max_size_kb', 1048576)),
                 static function (string $attribute, mixed $value, \Closure $fail): void {
                     if (! method_exists($value, 'getClientOriginalName')) {
                         $fail(__('database_backups.import_invalid_file'));

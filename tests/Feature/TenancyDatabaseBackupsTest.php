@@ -150,6 +150,44 @@ it('removes an archive import without a manifest before it can break backup list
     }
 });
 
+it('rejects backup archives whose uncompressed contents exceed the configured import limit', function (): void {
+    $archivePath = $this->backupPath.'/oversized.zip';
+    $zip = new ZipArchive;
+    $zip->open($archivePath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('manifest.json', json_encode([
+        'contains_tenants' => true,
+        'created_at' => now()->toIso8601String(),
+        'failed_tenants' => [],
+        'kind' => 'set',
+        'tenants' => [],
+    ], JSON_THROW_ON_ERROR));
+    $zip->addFromString('central.dump', str_repeat('x', 2 * 1024));
+    $zip->close();
+    config()->set('core-panel.administration.database_backups.import_max_size_kb', 1);
+
+    expect(filesize($archivePath))->toBeLessThan(1024)
+        ->and(fn (): mixed => app(TenancyDatabaseBackupService::class)->extractArchive('oversized.zip'))
+        ->toThrow(RuntimeException::class);
+});
+
+it('applies the configured import size limit to uploaded backup archives', function (): void {
+    $user = FakeUser::query()->create([
+        'email' => 'import-limit@example.test',
+        'first_name' => 'Import',
+        'last_name' => 'Limit',
+        'password' => bcrypt('password'),
+    ]);
+    config()->set('core-panel.administration.database_backups.import_max_size_kb', 1);
+
+    $this->actingAs($user)
+        ->from(route('core-panel.administration.index'))
+        ->post(route('core-panel.database-backups.import'), [
+            'backup' => UploadedFile::fake()->create('oversized.zip', 2, 'application/zip'),
+        ])
+        ->assertRedirect(route('core-panel.administration.index'))
+        ->assertSessionHasErrors('backup');
+});
+
 it('filters the administration backup table by content scope', function (): void {
     $user = FakeUser::query()->create([
         'email' => 'filter@example.test',

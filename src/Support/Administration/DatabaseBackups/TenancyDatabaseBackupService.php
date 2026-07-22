@@ -183,23 +183,26 @@ final class TenancyDatabaseBackupService
                 throw new RuntimeException('Database backup archive could not be opened.');
             }
 
-            if (! $zip->extractTo($directory)) {
+            try {
+                $this->validateArchiveEntries($zip);
+
+                $manifestContents = $zip->getFromName('manifest.json');
+
+                if (! is_string($manifestContents) || trim($manifestContents) === '') {
+                    throw new RuntimeException('Database backup archive manifest is missing.');
+                }
+
+                /** @var array<string, mixed> $manifest */
+                $manifest = json_decode($manifestContents, true, 512, JSON_THROW_ON_ERROR);
+
+                if (! $zip->extractTo($directory)) {
+                    throw new RuntimeException('Database backup archive could not be extracted.');
+                }
+
+                return new TenancyDatabaseBackupArchive($directory, $manifest);
+            } finally {
                 $zip->close();
-
-                throw new RuntimeException('Database backup archive could not be extracted.');
             }
-
-            $manifestContents = $zip->getFromName('manifest.json');
-            $zip->close();
-
-            if (! is_string($manifestContents) || trim($manifestContents) === '') {
-                throw new RuntimeException('Database backup archive manifest is missing.');
-            }
-
-            /** @var array<string, mixed> $manifest */
-            $manifest = json_decode($manifestContents, true, 512, JSON_THROW_ON_ERROR);
-
-            return new TenancyDatabaseBackupArchive($directory, $manifest);
         } catch (Throwable $throwable) {
             File::deleteDirectory($directory);
 
@@ -414,6 +417,42 @@ final class TenancyDatabaseBackupService
         if ($driver === 'sqlite') {
             File::put($sqlPath, $result->output());
         }
+    }
+
+    private function validateArchiveEntries(ZipArchive $zip): void
+    {
+        $totalSize = 0;
+        $maximumSize = $this->maximumImportSizeBytes();
+
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $entry = $zip->statIndex($index);
+
+            if ($entry === false) {
+                throw new RuntimeException('Database backup archive contains an invalid entry.');
+            }
+
+            $name = $entry['name'];
+
+            if (
+                str_contains($name, "\0")
+                || str_starts_with($name, '/')
+                || str_contains($name, '\\')
+                || in_array('..', explode('/', $name), true)
+            ) {
+                throw new RuntimeException('Database backup archive contains an unsafe entry path.');
+            }
+
+            if ($entry['size'] > $maximumSize - $totalSize) {
+                throw new RuntimeException('Database backup archive exceeds the configured import size limit.');
+            }
+
+            $totalSize += $entry['size'];
+        }
+    }
+
+    private function maximumImportSizeBytes(): int
+    {
+        return max(1, (int) config('core-panel.administration.database_backups.import_max_size_kb', 1048576)) * 1024;
     }
 
     private function fileFromPath(string $path): DatabaseBackupFile|TenancyDatabaseBackupFile
