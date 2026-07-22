@@ -60,6 +60,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
             __DIR__.'/../stubs/routes/central.php' => base_path('routes/central.php'),
             __DIR__.'/../stubs/routes/tenant.php' => base_path('routes/tenant.php'),
             __DIR__.'/../stubs/routes/universal.php' => base_path('routes/universal.php'),
+            __DIR__.'/../stubs/tests/Feature/CorePanelTenancyHostTest.php' => base_path('tests/Feature/CorePanelTenancyHostTest.php'),
             __DIR__.'/../routes/web/admin/settings.php' => base_path('routes/web/admin/settings.php'),
             __DIR__.'/../routes/web/tenants.php' => base_path('routes/web/tenants.php'),
         ], 'core-panel-tenancy-core');
