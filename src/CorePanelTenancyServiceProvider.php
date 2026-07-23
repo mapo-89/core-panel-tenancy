@@ -8,6 +8,7 @@ use CorePanel\Console\RunAutomaticDatabaseBackupCommand;
 use CorePanel\Contracts\SettingsLogoUrlGenerator;
 use CorePanel\Http\Controllers\Administration\AdministrationController;
 use CorePanel\Http\Controllers\Administration\DatabaseBackupController;
+use CorePanelTenancy\Console\ConvertMySqlDatetimesCommand;
 use CorePanelTenancy\Console\ConvertTimestampsToTimestamptzCommand;
 use CorePanelTenancy\Console\InstallTenancyCommand;
 use CorePanelTenancy\Console\TenancyRunAutomaticDatabaseBackupCommand;
@@ -60,6 +61,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         }
 
         $this->commands([
+            ConvertMySqlDatetimesCommand::class,
             ConvertTimestampsToTimestamptzCommand::class,
             InstallTenancyCommand::class,
             UpdateTenancyCommand::class,
@@ -316,6 +318,21 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
 
         $conversionConfig['datasets'] = $datasets;
         $databaseConfig['timestamp_tz_conversion'] = $conversionConfig;
+
+        /** @var array<string, mixed> $mysqlConversionConfig */
+        $mysqlConversionConfig = (array) ($databaseConfig['mysql_datetime_conversion'] ?? []);
+        /** @var array<string, mixed> $mysqlDatasets */
+        $mysqlDatasets = (array) ($mysqlConversionConfig['datasets'] ?? []);
+
+        foreach (['tenancy', 'tenant'] as $dataset) {
+            $mysqlDatasets[$dataset] = array_merge(
+                (array) ($mysqlDatasets[$dataset] ?? []),
+                (array) ($datasets[$dataset] ?? []),
+            );
+        }
+
+        $mysqlConversionConfig['datasets'] = $mysqlDatasets;
+        $databaseConfig['mysql_datetime_conversion'] = $mysqlConversionConfig;
 
         config()->set('core-panel.database', $databaseConfig);
     }
