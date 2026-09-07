@@ -400,6 +400,16 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($upsertTenantSuperAdminAction)->toContain("\$attributes['requires_password_setup'] = false;");
 });
 
+it('keeps the collapsed sidebar expanded while the tenant switcher menu is open', function (): void {
+    $coreSidebar = file_get_contents(__DIR__.'/../../../core-panel/resources/js/layouts/components/AppSidebar.vue');
+
+    expect($coreSidebar)->not->toBeFalse()
+        ->and($coreSidebar)->toContain('!tenantSwitcherMenuOpen.value')
+        ->and($coreSidebar)->toContain('isCollapsed && !tenantSwitcherMenuOpen')
+        ->and($coreSidebar)->toContain('@hide="tenantSwitcherMenuOpen = false"')
+        ->and($coreSidebar)->toContain('@show="handleTenantSwitcherMenuShow"');
+});
+
 it('keeps package-internal tenancy Vue imports independent from host aliases', function (): void {
     $root = __DIR__.'/../../resources/js';
     $iterator = new RecursiveIteratorIterator(
