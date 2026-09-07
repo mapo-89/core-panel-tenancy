@@ -21,7 +21,11 @@ final readonly class ViteConfigTenancyMerger
 
         $contents = (string) $this->files->get($viteConfigPath);
 
+        $contents = $this->mergeLanguagePath($contents);
+
         if (str_contains($contents, 'function resolveCorePanelTenancyImport(')) {
+            $this->files->put($viteConfigPath, $contents);
+
             return;
         }
 
@@ -52,6 +56,27 @@ final readonly class ViteConfigTenancyMerger
         );
 
         $this->files->put($viteConfigPath, $updatedContents);
+    }
+
+    private function mergeLanguagePath(string $contents): string
+    {
+        $tenancyLanguagePath = "    path.resolve(__dirname, 'vendor/mapo-89/core-panel-tenancy/resources/lang'),\n";
+
+        if (str_contains($contents, trim($tenancyLanguagePath))) {
+            return $contents;
+        }
+
+        $corePanelLanguagePath = "    path.resolve(__dirname, 'vendor/mapo-89/core-panel/resources/lang'),\n";
+
+        if (! str_contains($contents, $corePanelLanguagePath)) {
+            return $contents;
+        }
+
+        return str_replace(
+            $corePanelLanguagePath,
+            $corePanelLanguagePath.$tenancyLanguagePath,
+            $contents,
+        );
     }
 
     private static function tenancyPackagePath(): string

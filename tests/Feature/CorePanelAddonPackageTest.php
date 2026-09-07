@@ -481,10 +481,29 @@ it('adds the tenancy import alias only when the tenancy addon is installed', fun
 
     expect($contents)->toContain('const tenancyPackageJsPath = path.resolve(')
         ->and($contents)->toContain('vendor/mapo-89/core-panel-tenancy/resources/js')
+        ->and($contents)->toContain("path.resolve(__dirname, 'vendor/mapo-89/core-panel-tenancy/resources/lang')")
         ->and($contents)->toContain('function resolveCorePanelTenancyImport(importee: string): string | null {')
         ->and($contents)->toContain("importee.startsWith('@core-panel-tenancy/')")
         ->and($contents)->toContain('resolveCorePanelTenancyImport(importee) ??')
         ->and($contents)->toContain('resolveCorePanelImport(importee)');
+});
+
+it('adds missing tenancy translations to an already merged vite config', function (): void {
+    $basePath = makeTenancyUpdateBasePath('vite-config-language-path');
+    $viteConfigPath = $basePath.'/vite.config.ts';
+    $corePanelStub = __DIR__.'/../../../core-panel/stubs/vite.config.ts';
+
+    mkdir($basePath, 0777, true);
+    copy($corePanelStub, $viteConfigPath);
+
+    $merger = app(ViteConfigTenancyMerger::class);
+    $merger->merge($basePath);
+    $merger->merge($basePath);
+
+    $contents = (string) file_get_contents($viteConfigPath);
+
+    expect(substr_count($contents, 'vendor/mapo-89/core-panel-tenancy/resources/lang'))
+        ->toBe(1);
 });
 
 it('configures Media Library to use the tenant-aware URL generator when the addon is loaded', function (): void {
