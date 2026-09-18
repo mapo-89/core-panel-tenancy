@@ -6,6 +6,7 @@ use CorePanel\Http\Controllers\Administration\AdministrationController;
 use CorePanel\Http\Middleware\CheckPermission;
 use CorePanel\Http\Middleware\EnsureCorePanelEmailIsVerified;
 use CorePanel\Support\Administration\DatabaseBackups\DatabaseBackupRestoreStatus;
+use CorePanel\Support\Administration\SystemUpdates\ApplicationHealthUrl;
 use CorePanel\Tests\FakeUser;
 use CorePanelTenancy\Http\Controllers\Administration\TenancyAdministrationController;
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupFile;
@@ -14,13 +15,17 @@ use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBacku
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupSettings;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Configuration\ApplicationBuilder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
+use Spatie\Permission\Models\Permission;
 
 final class TestBackupTenant extends Model
 {
@@ -49,6 +54,19 @@ final class TestBackupTenant extends Model
             config()->set('database.connections.tenant', $previousConnection);
         }
     }
+}
+
+function useTenancyAdministrationHealthRoute(string $path): void
+{
+    $router = new Router(app('events'), app());
+    $action = Closure::bind(static fn (): array => ['status' => 'up'], null, ApplicationBuilder::class);
+
+    if (! $action instanceof Closure) {
+        throw new RuntimeException('Unable to create the application health route fixture.');
+    }
+
+    $router->get($path, $action);
+    app()->instance(ApplicationHealthUrl::class, new ApplicationHealthUrl($router));
 }
 
 beforeEach(function (): void {
@@ -88,6 +106,41 @@ it('binds the administration area to tenancy-specific backup services', function
         ->toBeInstanceOf(TenancyAdministrationController::class)
         ->and(app(TenancyDatabaseBackupSettings::class)->toArray()['automatic_scope'])
         ->toBe('full_set');
+});
+
+it('uses the configured application health route in the tenancy system updates tab', function (): void {
+    config()->set('core-panel.administration.database_backups.enabled', false);
+    config()->set('core-panel.administration.system_updates.enabled', true);
+    config()->set('core-panel.administration.system_updates.docker_only', false);
+    config()->set('core-panel.administration.system_updates.updater_url', 'http://system-updater:8080');
+    config()->set('core-panel.administration.system_updates.token', 'secret-token');
+
+    Http::fake([
+        'system-updater:8080/status' => Http::response([
+            'images' => [],
+            'update_available' => false,
+            'update_running' => false,
+        ]),
+        'system-updater:8080/logs' => Http::response(['entries' => []]),
+    ]);
+
+    $user = FakeUser::query()->create([
+        'email' => 'system-updates@example.test',
+        'first_name' => 'System',
+        'last_name' => 'Updates',
+        'password' => bcrypt('password'),
+    ]);
+    $user->givePermissionTo(Permission::findOrCreate('system-updates.view', 'web'));
+    useTenancyAdministrationHealthRoute('/health');
+
+    $this->actingAs($user)
+        ->withHeaders([
+            'X-Inertia' => 'true',
+            'X-Requested-With' => 'XMLHttpRequest',
+        ])
+        ->get(route('core-panel.administration.index'))
+        ->assertSuccessful()
+        ->assertJsonPath('props.systemUpdatesTab.routes.health', url('/health'));
 });
 
 it('uses distinct archive paths for tenant IDs with the same sanitized segment', function (): void {

@@ -6,6 +6,7 @@ namespace CorePanelTenancy\Http\Controllers\Administration;
 
 use CorePanel\Support\Administration\DatabaseBackups\DatabaseBackupCloudBackupService;
 use CorePanel\Support\Administration\DatabaseBackups\DatabaseBackupFile;
+use CorePanel\Support\Administration\SystemUpdates\ApplicationHealthUrl;
 use CorePanel\Support\Administration\SystemUpdates\SystemUpdaterClient;
 use CorePanel\Support\Permissions\PermissionService;
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupFile;
@@ -30,6 +31,7 @@ final class TenancyAdministrationController extends Controller
         private readonly TenancyDatabaseBackupRestoreService $backupRestoreService,
         private readonly TenancyDatabaseBackupSettings $backupSettings,
         private readonly TenancyDatabaseBackupService $backups,
+        private readonly ApplicationHealthUrl $healthUrl,
         private readonly PermissionService $permissions,
         private readonly SystemUpdaterClient $systemUpdater,
     ) {}
@@ -287,6 +289,7 @@ final class TenancyAdministrationController extends Controller
             'logs' => $this->systemUpdater->safeLogs(),
             'routes' => [
                 'check' => route('core-panel.system-updates.check'),
+                'health' => $this->healthUrl->resolve(),
                 'status' => route('core-panel.system-updates.status'),
                 'update' => route('core-panel.system-updates.update'),
             ],
