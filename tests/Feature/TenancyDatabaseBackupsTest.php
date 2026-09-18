@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use CorePanel\Contracts\SystemUpdateSettingsAccess;
 use CorePanel\Http\Controllers\Administration\AdministrationController;
 use CorePanel\Http\Middleware\CheckPermission;
 use CorePanel\Http\Middleware\EnsureCorePanelEmailIsVerified;
@@ -108,10 +109,11 @@ it('binds the administration area to tenancy-specific backup services', function
         ->toBe('full_set');
 });
 
-it('uses the configured application health route in the tenancy system updates tab', function (): void {
+it('keeps force updates available when automatic settings are hidden in a tenancy request', function (): void {
     config()->set('core-panel.administration.database_backups.enabled', false);
     config()->set('core-panel.administration.system_updates.enabled', true);
     config()->set('core-panel.administration.system_updates.docker_only', false);
+    config()->set('core-panel.administration.system_updates.force_update_enabled', true);
     config()->set('core-panel.administration.system_updates.updater_url', 'http://system-updater:8080');
     config()->set('core-panel.administration.system_updates.token', 'secret-token');
 
@@ -132,6 +134,13 @@ it('uses the configured application health route in the tenancy system updates t
     ]);
     $user->givePermissionTo(Permission::findOrCreate('system-updates.view', 'web'));
     useTenancyAdministrationHealthRoute('/health');
+    app()->instance(SystemUpdateSettingsAccess::class, new class implements SystemUpdateSettingsAccess
+    {
+        public function allows(): bool
+        {
+            return false;
+        }
+    });
 
     $this->actingAs($user)
         ->withHeaders([
@@ -140,6 +149,8 @@ it('uses the configured application health route in the tenancy system updates t
         ])
         ->get(route('core-panel.administration.index'))
         ->assertSuccessful()
+        ->assertJsonPath('props.systemUpdatesTab.automatic', null)
+        ->assertJsonPath('props.systemUpdatesTab.forceUpdateEnabled', true)
         ->assertJsonPath('props.systemUpdatesTab.routes.health', url('/health'));
 });
 

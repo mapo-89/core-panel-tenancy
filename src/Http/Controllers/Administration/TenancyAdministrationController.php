@@ -8,6 +8,7 @@ use CorePanel\Support\Administration\DatabaseBackups\DatabaseBackupCloudBackupSe
 use CorePanel\Support\Administration\DatabaseBackups\DatabaseBackupFile;
 use CorePanel\Support\Administration\SystemUpdates\ApplicationHealthUrl;
 use CorePanel\Support\Administration\SystemUpdates\SystemUpdaterClient;
+use CorePanel\Support\Administration\SystemUpdates\SystemUpdateSettingsPayload;
 use CorePanel\Support\Permissions\PermissionService;
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupFile;
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupRestoreService;
@@ -34,6 +35,7 @@ final class TenancyAdministrationController extends Controller
         private readonly ApplicationHealthUrl $healthUrl,
         private readonly PermissionService $permissions,
         private readonly SystemUpdaterClient $systemUpdater,
+        private readonly SystemUpdateSettingsPayload $systemUpdateSettingsPayload,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -278,14 +280,8 @@ final class TenancyAdministrationController extends Controller
         }
 
         return [
-            'automatic' => [
-                'enabled' => (bool) config('core-panel.administration.system_updates.automatic.enabled', false),
-                'forceUpdateEnabled' => (bool) config('core-panel.administration.system_updates.force_update_enabled', false),
-                'inactiveMinutes' => (int) config('core-panel.administration.system_updates.automatic.inactive_minutes', 15),
-                'timezone' => (string) config('core-panel.administration.system_updates.automatic.timezone', config('app.timezone')),
-                'windowEnd' => (string) config('core-panel.administration.system_updates.automatic.window_end', '04:00'),
-                'windowStart' => (string) config('core-panel.administration.system_updates.automatic.window_start', '02:00'),
-            ],
+            'automatic' => $this->systemUpdateSettingsPayload->forUser($user),
+            'forceUpdateEnabled' => $this->systemUpdater->forceUpdateEnabled(),
             'logs' => $this->systemUpdater->safeLogs(),
             'routes' => [
                 'check' => route('core-panel.system-updates.check'),

@@ -105,20 +105,24 @@ const props = defineProps<{
     } | null
     systemUpdatesTab?: {
         automatic: {
+            canUpdate: boolean
             enabled: boolean
-            forceUpdateEnabled: boolean
-            inactiveMinutes: number
+            interval: 'daily' | 'weekly'
+            intervalOptions: Array<{ label: string; value: string }>
+            lastAutomaticRunAt: string | null
+            maintenanceWindowEnabled: boolean
+            mode: 'check' | 'install'
+            modeOptions: Array<{ label: string; value: string }>
+            time: string
             timezone: string
+            weekday: string | null
+            weekdayOptions: Array<{ label: string; value: string }>
             windowEnd: string
             windowStart: string
-        }
+        } | null
+        forceUpdateEnabled: boolean
         logs: {
             entries?: SystemUpdateLogEntry[]
-        }
-        routes: {
-            check: string
-            status: string
-            update: string
         }
         status: {
             configured: boolean

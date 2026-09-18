@@ -6,6 +6,7 @@ namespace CorePanelTenancy;
 
 use CorePanel\Console\RunAutomaticDatabaseBackupCommand;
 use CorePanel\Contracts\SettingsLogoUrlGenerator;
+use CorePanel\Contracts\SystemUpdateSettingsAccess;
 use CorePanel\Http\Controllers\Administration\AdministrationController;
 use CorePanel\Http\Controllers\Administration\DatabaseBackupController;
 use CorePanelTenancy\Console\ConvertMySqlDatetimesCommand;
@@ -20,6 +21,7 @@ use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBacku
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupService;
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupSettings;
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupTenancySupport;
+use CorePanelTenancy\Support\Administration\SystemUpdates\CentralSystemUpdateSettingsAccess;
 use CorePanelTenancy\Support\Media\TenantAwareUrlGenerator;
 use CorePanelTenancy\Support\Settings\TenantAwareSettingsLogoUrlGenerator;
 use CorePanelTenancy\Support\Tenancy\TenantSwitcher;
@@ -41,6 +43,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         $this->mergeFortifyMiddlewareConfig();
         $this->configureMediaLibraryForTenancy();
         $this->bindTenancyDatabaseBackups();
+        $this->app->bind(SystemUpdateSettingsAccess::class, CentralSystemUpdateSettingsAccess::class);
         $this->app->bind(SettingsLogoUrlGenerator::class, TenantAwareSettingsLogoUrlGenerator::class);
     }
 
