@@ -244,7 +244,7 @@ final class UpdateTenantRequest extends FormRequest
         if (is_string($superAdminUserId) && $superAdminUserId !== '') {
             $existingUser = $userModel::query()->find($superAdminUserId);
 
-            if ($existingUser instanceof Model && $existingUser instanceof Authenticatable) {
+            if ($existingUser !== null) {
                 return (string) $existingUser->getAuthIdentifier();
             }
         }
@@ -254,7 +254,7 @@ final class UpdateTenantRequest extends FormRequest
         if (is_string($superAdminEmail) && $superAdminEmail !== '') {
             $existingUser = $userModel::query()->where('email', $superAdminEmail)->first();
 
-            if ($existingUser instanceof Model && $existingUser instanceof Authenticatable) {
+            if ($existingUser !== null) {
                 return (string) $existingUser->getAuthIdentifier();
             }
         }

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use CorePanel\CorePanelServiceProvider;
 use CorePanelTenancy\Http\Controllers\CentralTenantImpersonationController;
 use CorePanelTenancy\Http\Controllers\LeaveTenantImpersonationController;
 use CorePanelTenancy\Http\Controllers\TenantImpersonationController;
@@ -25,8 +26,13 @@ $tenantWebMiddleware = [
     InitializeTenancyByDomain::class,
     PreventAccessFromCentralDomains::class,
 ];
-$webRoutes = require base_path('routes/web/routes.php');
-$packageWebRoutesRoot = base_path('vendor/mapo-89/core-panel/routes/web');
+$corePanelPackageRoot = dirname((new ReflectionClass(CorePanelServiceProvider::class))->getFileName(), 2);
+$hostWebRoutesManifest = base_path('routes/web/routes.php');
+$packageWebRoutesRoot = $corePanelPackageRoot.'/routes/web';
+$packageWebRoutesManifest = $corePanelPackageRoot.'/stubs/routes/web/routes.php';
+$webRoutes = require is_file($hostWebRoutesManifest)
+    ? $hostWebRoutesManifest
+    : $packageWebRoutesManifest;
 $loadTenantWebRouteFile = static function (string $file) use ($packageWebRoutesRoot): void {
     $hostRoutePath = base_path('routes/web/'.$file);
 

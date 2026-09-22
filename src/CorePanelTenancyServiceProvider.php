@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace CorePanelTenancy;
 
 use CorePanel\Console\RunAutomaticDatabaseBackupCommand;
+use CorePanel\Contracts\HorizonAccess;
+use CorePanel\Contracts\PresenceCacheKeyResolver;
 use CorePanel\Contracts\SettingsLogoUrlGenerator;
 use CorePanel\Contracts\SystemUpdateSettingsAccess;
 use CorePanel\Http\Controllers\Administration\AdministrationController;
 use CorePanel\Http\Controllers\Administration\DatabaseBackupController;
+use CorePanel\Support\Migrations\MigrationPathResolver;
 use CorePanelTenancy\Console\ConvertMySqlDatetimesCommand;
 use CorePanelTenancy\Console\ConvertTimestampsToTimestamptzCommand;
 use CorePanelTenancy\Console\InstallTenancyCommand;
@@ -22,7 +25,9 @@ use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBacku
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupSettings;
 use CorePanelTenancy\Support\Administration\DatabaseBackups\TenancyDatabaseBackupTenancySupport;
 use CorePanelTenancy\Support\Administration\SystemUpdates\CentralSystemUpdateSettingsAccess;
+use CorePanelTenancy\Support\Horizon\TenantAwareHorizonAccess;
 use CorePanelTenancy\Support\Media\TenantAwareUrlGenerator;
+use CorePanelTenancy\Support\Presence\TenantAwarePresenceCacheKeyResolver;
 use CorePanelTenancy\Support\Settings\TenantAwareSettingsLogoUrlGenerator;
 use CorePanelTenancy\Support\Tenancy\TenantSwitcher;
 use Illuminate\Routing\Router;
@@ -38,6 +43,7 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->registerTenantMigrationPaths();
         $this->mergeCorePanelAccessConfig();
         $this->mergeTimestampTzConversionConfig();
         $this->mergeFortifyMiddlewareConfig();
@@ -45,6 +51,50 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         $this->bindTenancyDatabaseBackups();
         $this->app->bind(SystemUpdateSettingsAccess::class, CentralSystemUpdateSettingsAccess::class);
         $this->app->bind(SettingsLogoUrlGenerator::class, TenantAwareSettingsLogoUrlGenerator::class);
+        $this->app->bind(PresenceCacheKeyResolver::class, TenantAwarePresenceCacheKeyResolver::class);
+        $this->app->bind(HorizonAccess::class, TenantAwareHorizonAccess::class);
+    }
+
+    private function registerTenantMigrationPaths(): void
+    {
+        $previousPackagePaths = MigrationPathResolver::tenantPackage();
+
+        $this->appendMigrationPath('host_paths', __DIR__.'/../database/migrations');
+        $this->appendMigrationPath('tenant_paths', __DIR__.'/../database/tenant-migrations');
+
+        $this->refreshTenantMigrationParameters($previousPackagePaths);
+    }
+
+    /**
+     * @param  list<string>  $previousPackagePaths
+     */
+    private function refreshTenantMigrationParameters(array $previousPackagePaths): void
+    {
+        $currentPackagePaths = MigrationPathResolver::tenantPackage();
+        $packagePaths = array_unique([...$previousPackagePaths, ...$currentPackagePaths]);
+        $configuredPaths = config('tenancy.migration_parameters.--path', []);
+        $hostPaths = array_filter(
+            is_array($configuredPaths) ? $configuredPaths : [],
+            static fn (mixed $path): bool => is_string($path)
+                && $path !== ''
+                && ! in_array($path, $packagePaths, true),
+        );
+
+        config()->set('tenancy.migration_parameters.--path', array_values(array_unique([
+            ...MigrationPathResolver::tenant(),
+            ...$hostPaths,
+        ])));
+    }
+
+    private function appendMigrationPath(string $key, string $path): void
+    {
+        /** @var list<string> $paths */
+        $paths = array_values(array_filter(
+            (array) config("core-panel.migrations.{$key}", []),
+            static fn (mixed $configuredPath): bool => is_string($configuredPath) && $configuredPath !== '',
+        ));
+
+        config()->set("core-panel.migrations.{$key}", array_values(array_unique([...$paths, $path])));
     }
 
     public function boot(): void
@@ -62,6 +112,8 @@ final class CorePanelTenancyServiceProvider extends ServiceProvider
         if (! $this->app->runningInConsole()) {
             return;
         }
+
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         $this->commands([
             ConvertMySqlDatetimesCommand::class,

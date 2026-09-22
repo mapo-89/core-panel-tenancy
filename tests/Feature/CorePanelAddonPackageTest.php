@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use CorePanel\Contracts\SettingsLogoUrlGenerator;
+use CorePanel\Support\Migrations\ManagedMigrationScaffoldMigrator;
+use CorePanel\Support\Migrations\MigrationPathResolver;
 use CorePanel\Support\Publishing\CorePanelPublisher;
 use CorePanelTenancy\Console\InstallTenancyCommand;
 use CorePanelTenancy\Console\UpdateTenancyCommand;
@@ -21,23 +23,34 @@ use Illuminate\Support\ServiceProvider;
 
 function tenancyMigrationStubPath(string $filename, string $scope = ''): string
 {
-    $root = __DIR__.'/../../stubs/database/migrations'.($scope !== '' ? '/'.$scope : '');
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
-    );
+    $roots = match ($scope) {
+        'tenancy' => [__DIR__.'/../../database/migrations'],
+        'tenant' => [
+            __DIR__.'/../../stubs/database/migrations/tenant',
+            __DIR__.'/../../database/tenant-migrations',
+            __DIR__.'/../../../core-panel/database/migrations',
+        ],
+        default => [__DIR__.'/../../stubs/database/migrations'],
+    };
 
-    foreach ($iterator as $file) {
-        if ($file->isFile() && $file->getFilename() === $filename) {
-            return $file->getPathname();
+    foreach ($roots as $root) {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && $file->getFilename() === $filename) {
+                return $file->getPathname();
+            }
         }
     }
 
-    return $root.'/'.$filename;
+    return $roots[0].'/'.$filename;
 }
 
 function makeTenancyUpdateBasePath(string $suffix): string
 {
-    return sys_get_temp_dir().'/core-panel-tenancy-update-'.bin2hex(random_bytes(4)).'-'.$suffix;
+    return corePanelTestTemporaryPath('tenancy-update-'.$suffix);
 }
 
 function readTenancyPublishManifest(string $basePath): array
@@ -52,6 +65,82 @@ function readTenancyPublishManifest(string $basePath): array
 
     return $decoded;
 }
+
+it('registers central tenancy migrations and tenant-specific migration overrides', function (): void {
+    $basePath = makeTenancyUpdateBasePath('package-migration-paths');
+    $hostMigrations = MigrationPathResolver::host($basePath);
+    $tenantMigrations = MigrationPathResolver::tenant($basePath);
+    $authenticationLogMigration = collect($tenantMigrations)->first(
+        static fn (string $path): bool => basename($path) === '2026_01_01_000021_create_authentication_logs_table.php',
+    );
+
+    expect($hostMigrations)->toContain((string) realpath(__DIR__.'/../../database/migrations/2026_01_01_000001_create_tenants_table.php'))
+        ->and($tenantMigrations)->not->toContain((string) realpath(__DIR__.'/../../../core-panel/database/migrations/2026_01_01_000021_create_authentication_logs_table.php'))
+        ->and($authenticationLogMigration)->toBe((string) realpath(__DIR__.'/../../database/tenant-migrations/2026_01_01_000021_create_authentication_logs_table.php'))
+        ->and(array_map('basename', $tenantMigrations))->toBe(array_values(array_unique(array_map('basename', $tenantMigrations))));
+});
+
+it('refreshes materialized tenancy migration parameters after registering addon paths', function (): void {
+    config()->set('core-panel.migrations.tenant_paths', []);
+
+    $materializedPaths = MigrationPathResolver::tenant();
+    $customTenantMigrationPath = base_path('database/application-tenant-migrations');
+    $materializedAuthenticationLogMigration = collect($materializedPaths)->first(
+        static fn (string $path): bool => basename($path) === '2026_01_01_000021_create_authentication_logs_table.php',
+    );
+
+    config()->set('tenancy.migration_parameters', [
+        '--force' => false,
+        '--path' => [...$materializedPaths, $customTenantMigrationPath, $customTenantMigrationPath],
+        '--realpath' => true,
+        '--step' => 2,
+    ]);
+
+    (new CorePanelTenancyServiceProvider(app()))->register();
+
+    $migrationParameters = config('tenancy.migration_parameters');
+
+    if (! is_array($migrationParameters)) {
+        throw new UnexpectedValueException('Expected tenancy migration parameters to be an array.');
+    }
+
+    $refreshedPaths = $migrationParameters['--path'] ?? null;
+
+    if (! is_array($refreshedPaths)) {
+        throw new UnexpectedValueException('Expected tenancy migration paths to be an array.');
+    }
+
+    $refreshedAuthenticationLogMigration = collect($refreshedPaths)->first(
+        static fn (mixed $path): bool => is_string($path)
+            && basename($path) === '2026_01_01_000021_create_authentication_logs_table.php',
+    );
+
+    expect($materializedAuthenticationLogMigration)
+        ->toBe((string) realpath(__DIR__.'/../../../core-panel/database/migrations/2026_01_01_000021_create_authentication_logs_table.php'))
+        ->and($refreshedPaths)->toBe([...MigrationPathResolver::tenant(), $customTenantMigrationPath])
+        ->and($refreshedAuthenticationLogMigration)
+        ->toBe((string) realpath(__DIR__.'/../../database/tenant-migrations/2026_01_01_000021_create_authentication_logs_table.php'))
+        ->and($migrationParameters['--force'])->toBeFalse()
+        ->and($migrationParameters['--realpath'])->toBeTrue()
+        ->and($migrationParameters['--step'])->toBe(2);
+});
+
+it('keeps tenancy migration baselines aligned with package migration contents', function (): void {
+    foreach (ManagedMigrationScaffoldMigrator::tenancyHostScaffolds() as $legacyPath => $legacyHash) {
+        $packageMigration = __DIR__.'/../../database/migrations/'.basename($legacyPath);
+
+        expect(hash_file('sha256', $packageMigration))->toBe($legacyHash);
+    }
+
+    foreach (ManagedMigrationScaffoldMigrator::coreTenantScaffolds() as $legacyPath => $legacyHash) {
+        $basename = basename($legacyPath);
+        $packageMigration = $basename === '2026_01_01_000021_create_authentication_logs_table.php'
+            ? __DIR__.'/../../database/tenant-migrations/'.$basename
+            : __DIR__.'/../../../core-panel/database/migrations/'.$basename;
+
+        expect(hash_file('sha256', $packageMigration))->toBe($legacyHash);
+    }
+});
 
 it('publishes the stancl tenancy foundation for host applications', function (): void {
     $readme = file_get_contents(__DIR__.'/../../README.md');
@@ -90,6 +179,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
     $corePanelTenancyContextStub = file_get_contents(__DIR__.'/../../stubs/merge/core-panel-tenancy-context.stub');
     $sessionCookieMiddleware = file_get_contents(__DIR__.'/../../src/Http/Middleware/SetTenantAwareSessionCookie.php');
     $handleInertiaRequests = file_get_contents(__DIR__.'/../../../core-panel/stubs/app/Http/Middleware/HandleInertiaRequests.php');
+    $corePanelSharedProps = file_get_contents(__DIR__.'/../../../core-panel/src/Support/Inertia/CorePanelSharedProps.php');
     $tenantsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000001_create_tenants_table.php', 'tenancy'));
     $domainsMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000020_create_domains_table.php', 'tenancy'));
     $impersonationTokensMigration = file_get_contents(tenancyMigrationStubPath('2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php', 'tenancy'));
@@ -176,7 +266,10 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($provider)->toContain("publishableTree(__DIR__.'/../stubs/lang', lang_path())")
         ->and($provider)->toContain("publishableTree(__DIR__.'/../resources/lang', \$this->app->langPath('vendor/core-panel-tenancy'))")
         ->and($provider)->toContain("resources/js/pages/Admin/Users/Index.vue' => resource_path('js/pages/Admin/Users/Index.vue')")
-        ->and($tenantRouteFile)->toContain("\$packageWebRoutesRoot = base_path('vendor/mapo-89/core-panel/routes/web');")
+        ->and($tenantRouteFile)->toContain('new ReflectionClass(CorePanelServiceProvider::class)')
+        ->and($tenantRouteFile)->toContain("\$hostWebRoutesManifest = base_path('routes/web/routes.php');")
+        ->and($tenantRouteFile)->toContain("\$packageWebRoutesManifest = \$corePanelPackageRoot.'/stubs/routes/web/routes.php';")
+        ->and($tenantRouteFile)->toContain('is_file($hostWebRoutesManifest)')
         ->and($tenantRouteFile)->toContain('Unable to locate CorePanel tenant web route fragment')
         ->and($tenantUsersOverride)->toContain('resyncManagedRoles')
         ->and($tenantUsersOverride)->toContain("'assignableRoles'")
@@ -279,7 +372,8 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($coreSidebar)->toContain('tenantSwitcher')
         ->and($coreSidebar)->toContain('tenantSwitcherOptions.length > 0')
         ->and($coreSidebar)->toContain("\$t('common.ui.search')")
-        ->and($handleInertiaRequests)->toContain("'corePanel' => [")
+        ->and($handleInertiaRequests)->toContain('CorePanelSharedProps')
+        ->and($corePanelSharedProps)->toContain("'corePanel' => [")
         ->and($tenantForm)->toContain('index as tenantsIndex')
         ->and($tenantForm)->toContain('store as storeTenant')
         ->and($tenantForm)->toContain('update as updateTenant')
@@ -331,7 +425,7 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantRouteFile)->toContain("foreach (\$webRoutes['public'] as \$publicRouteFile)")
         ->and($universalRouteFile)->not->toContain("\$loadUniversalWebRouteFile('auth.php');")
         ->and($universalRouteFile)->toContain("\$loadUniversalWebRouteFile('platform.php');")
-        ->and($tenantRouteFile)->toContain("\$packageWebRoutesRoot = base_path('vendor/mapo-89/core-panel/routes/web');")
+        ->and($tenantRouteFile)->toContain("\$packageWebRoutesRoot = \$corePanelPackageRoot.'/routes/web';")
         ->and($tenantRouteFile)->toContain('Unable to locate CorePanel tenant web route fragment')
         ->and($tenantSettingsRouteFile)->toContain('use CorePanelTenancy\Http\Controllers\SettingsController;')
         ->and($tenantSettingsRouteFile)->toContain("Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');")
@@ -371,12 +465,12 @@ it('publishes the stancl tenancy foundation for host applications', function ():
         ->and($tenantOauthDeviceCodesMigration)->toContain("\$table->uuid('user_id')->nullable()->index();")
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2019_12_14_000001_create_personal_access_tokens_table.php'))->toBeFalse()
         ->and($tenantSettingsMigration)->toContain("Schema::create('settings'")
-        ->and(file_exists(tenancyMigrationStubPath('2026_01_01_000021_create_authentication_logs_table.php', 'tenant')))->toBeTrue()
+        ->and(tenancyMigrationStubPath('2026_01_01_000021_create_authentication_logs_table.php', 'tenant'))->toContain('/database/tenant-migrations/')
         ->and($tenantMediaMigration)->toContain("\$table->string('model_id');")
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000004_add_core_panel_fields_to_users_table.php'))->toBeFalse()
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000016_add_core_panel_metadata_to_roles_table.php'))->toBeFalse()
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000020_add_requires_password_setup_to_users_table.php'))->toBeFalse()
-        ->and(file_exists(tenancyMigrationStubPath('2026_01_01_000023_add_invitation_tracking_columns_to_users_table.php', 'tenant')))->toBeTrue()
+        ->and(tenancyMigrationStubPath('2026_01_01_000023_add_invitation_tracking_columns_to_users_table.php', 'tenant'))->toContain('/core-panel/database/migrations/')
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000021_change_activity_log_morph_ids_to_strings.php'))->toBeFalse()
         ->and(file_exists(__DIR__.'/../../stubs/database/migrations/tenant/2026_01_01_000022_change_media_model_morph_ids_to_strings.php'))->toBeFalse()
         ->and($tenantAwareUrlGenerator)->toContain('class TenantAwareUrlGenerator extends DefaultUrlGenerator')
@@ -721,7 +815,7 @@ PHP);
 });
 
 it('normalizes generated wayfinder route urls back to relative paths for central-domain routes', function (): void {
-    $basePath = sys_get_temp_dir().'/core-panel-wayfinder-'.bin2hex(random_bytes(8));
+    $basePath = corePanelTestTemporaryPath('wayfinder');
     $routesPath = $basePath.'/resources/js/routes/profile';
 
     mkdir($routesPath, 0777, true);
@@ -754,7 +848,7 @@ TS,
 });
 
 it('composes generated wayfinder controller methods onto multi-route default exports', function (string $lineEnding): void {
-    $basePath = sys_get_temp_dir().'/core-panel-wayfinder-actions-'.bin2hex(random_bytes(8));
+    $basePath = corePanelTestTemporaryPath('wayfinder-actions');
     $actionsPath = $basePath.'/resources/js/actions/CorePanel/Http/Controllers/Auth';
 
     mkdir($actionsPath, 0777, true);
@@ -1071,50 +1165,108 @@ it('does not report legacy tenancy UI overrides as conflicts without force', fun
         ->and(file_exists($basePath.'/storage/app/core-panel/published.json'))->toBeTrue();
 });
 
-it('publishes the impersonation token migration during tenancy addon updates when it was not previously published', function (): void {
-    $basePath = makeTenancyUpdateBasePath('missing-impersonation-migration');
+it('requires breaking-change mode before removing package-owned tenancy migrations', function (): void {
+    $basePath = makeTenancyUpdateBasePath('impersonation-migration-breaking-guard');
     $target = $basePath.'/database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
     $source = tenancyMigrationStubPath('2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php', 'tenancy');
 
-    mkdir($basePath.'/storage/app/core-panel', 0777, true);
-    file_put_contents($basePath.'/storage/app/core-panel/published.json', json_encode([
-        'files' => [],
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
+    mkdir(dirname($target), 0777, true);
+    file_put_contents($target, (string) file_get_contents($source));
 
     $this->artisan('core-panel:tenancy:update', [
         '--base-path' => $basePath,
-    ])->assertExitCode(0);
+    ])->assertExitCode(1);
 
-    $manifest = readTenancyPublishManifest($basePath);
-
-    expect(file_get_contents($target))->toBe(file_get_contents($source))
-        ->and($manifest['files'][$target] ?? null)->toBeArray()
-        ->and($manifest['files'][$target]['tag'] ?? null)->toBe('core-panel-tenancy-migrations');
+    expect(file_get_contents($target))->toBe(file_get_contents($source));
 });
 
-it('does not duplicate the impersonation token migration when the basename already exists in tenancy migrations', function (): void {
-    $basePath = makeTenancyUpdateBasePath('existing-impersonation-migration-basename');
+it('backs up and removes package-owned tenancy migrations in breaking-change mode', function (): void {
+    $basePath = makeTenancyUpdateBasePath('impersonation-migration-relocation');
     $target = $basePath.'/database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
-    $existingTenancyMigration = $basePath.'/database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
     $source = tenancyMigrationStubPath('2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php', 'tenancy');
 
-    mkdir(dirname($existingTenancyMigration), 0777, true);
-    mkdir($basePath.'/storage/app/core-panel', 0777, true);
-    file_put_contents($existingTenancyMigration, (string) file_get_contents($source));
-    file_put_contents($basePath.'/storage/app/core-panel/published.json', json_encode([
-        'files' => [],
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
+    mkdir(dirname($target), 0777, true);
+    file_put_contents($target, (string) file_get_contents($source));
 
     $this->artisan('core-panel:tenancy:update', [
         '--base-path' => $basePath,
+        '--breaking-changes' => true,
+    ])->assertExitCode(0);
+
+    $backups = glob($basePath.'/.core-panel-backups/*/database/migrations/tenancy/'.basename($target));
+
+    expect(file_exists($target))->toBeFalse()
+        ->and($backups)->not->toBeFalse()
+        ->and($backups)->toHaveCount(1)
+        ->and(file_get_contents($backups[0]))->toBe(file_get_contents($source));
+});
+
+it('removes customized managed tenancy migrations from the published asset manifest', function (): void {
+    $basePath = makeTenancyUpdateBasePath('managed-tenancy-migration-relocation');
+    $relativePath = 'database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
+    $target = $basePath.'/'.$relativePath;
+    $manifestPath = $basePath.'/storage/app/core-panel/published.json';
+    $customized = "<?php\n// customized managed tenancy migration\n";
+
+    mkdir(dirname($target), 0777, true);
+    mkdir(dirname($manifestPath), 0777, true);
+    file_put_contents($target, $customized);
+    file_put_contents($manifestPath, json_encode(['files' => [
+        $relativePath => [
+            'tag' => 'core-panel-tenancy-migrations',
+            'source' => 'legacy',
+            'source_hash' => hash('sha256', 'legacy'),
+            'destination_hash' => hash('sha256', $customized),
+            'published_at' => now()->toIso8601String(),
+        ],
+    ]], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+        '--breaking-changes' => true,
     ])->assertExitCode(0);
 
     $manifest = readTenancyPublishManifest($basePath);
+    $backups = glob($basePath.'/.core-panel-backups/*/'.$relativePath);
 
-    expect(file_exists($target))->toBeTrue()
-        ->and(file_get_contents($target))->toBe(file_get_contents($source))
-        ->and($manifest['files'][$target] ?? null)->toBeArray()
-        ->and($manifest['files'][$target]['tag'] ?? null)->toBe('core-panel-tenancy-migrations');
+    expect(file_exists($target))->toBeFalse()
+        ->and($manifest['files'])->not->toHaveKey($relativePath)
+        ->and($backups)->not->toBeFalse()
+        ->and($backups)->toHaveCount(1)
+        ->and(file_get_contents($backups[0]))->toBe($customized);
+});
+
+it('refuses to relocate a published tenancy migration modified after publication', function (): void {
+    $basePath = makeTenancyUpdateBasePath('modified-managed-tenancy-migration-conflict');
+    $relativePath = 'database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php';
+    $target = $basePath.'/'.$relativePath;
+    $publishedContents = (string) file_get_contents(tenancyMigrationStubPath(basename($target), 'tenancy'));
+    $customizedContents = $publishedContents."\n// host schema customization\n";
+    $manifestPath = $basePath.'/storage/app/core-panel/published.json';
+
+    mkdir(dirname($target), 0777, true);
+    mkdir(dirname($manifestPath), 0777, true);
+    file_put_contents($target, $customizedContents);
+    file_put_contents($manifestPath, json_encode(['files' => [
+        $relativePath => [
+            'tag' => 'core-panel-tenancy-migrations',
+            'source' => 'legacy',
+            'source_hash' => md5($publishedContents),
+            'destination_hash' => md5($publishedContents),
+            'published_at' => now()->toIso8601String(),
+        ],
+    ]], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL);
+
+    $this->artisan('core-panel:tenancy:update', [
+        '--base-path' => $basePath,
+        '--breaking-changes' => true,
+    ])->assertExitCode(1);
+
+    $manifest = readTenancyPublishManifest($basePath);
+
+    expect(file_get_contents($target))->toBe($customizedContents)
+        ->and($manifest['files'])->toHaveKey($relativePath)
+        ->and(glob($basePath.'/.core-panel-backups/*/'.$relativePath))->toBe([]);
 });
 
 it('does not recreate removed tenancy translation overrides during updates', function (): void {
@@ -1147,8 +1299,9 @@ it('refreshes tenancy publish tags through the addon provider for in-place updat
     expect($command)->toContain('CorePanelTenancyServiceProvider::class')
         ->and($command)->toContain('adoptUnmanagedExisting: true')
         ->and($command)->not->toContain("'core-panel-tenancy-ui'")
-        ->and($command)->toContain('managedMissingPaths: $this->resolveRequiredUpdatePaths($basePath)')
-        ->and($command)->toContain("'database/migrations/tenancy/2026_01_01_000024_create_tenant_user_impersonation_tokens_table.php'")
+        ->and($command)->toContain('ManagedMigrationScaffoldMigrator::coreTenantScaffolds()')
+        ->and($command)->toContain('ManagedMigrationScaffoldMigrator::tenancyHostScaffolds()')
+        ->and($command)->toContain("option('breaking-changes')")
         ->and($command)->not->toContain('publishProviderTag(CorePanelTenancyServiceProvider::class, $tag, $force);')
         ->and($command)->toContain('if ($basePath === null) {')
         ->and($command)->toContain('ensureTenancyProviderRegistered($basePath);')

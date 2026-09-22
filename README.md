@@ -47,6 +47,25 @@ The conversion uses the configured source timezone from `core-panel.database.tim
 
 ## Update
 
+### Upgrading To 1.6.0 (Breaking)
+
+CorePanel Tenancy 1.6.0 must be updated together with CorePanel 1.6.0 because central and tenant migration ownership, generated route handling, and package/host composition change.
+
+Back up the central and tenant databases and commit or back up the host application before running:
+
+```bash
+composer update mapo-89/core-panel mapo-89/core-panel-tenancy
+php artisan core-panel:update --force --breaking-changes --with-addon-updates
+npm install
+php artisan wayfinder:generate --no-interaction
+npm run build
+php artisan optimize:clear
+```
+
+The addon now owns its central migrations and tenant-specific package overrides. Existing migration ledger entries remain valid because migration basenames are preserved. Recognized unchanged host copies are backed up and removed; locally modified migrations remain in the host as conflicts and require manual review. A preserved migration under `database/migrations/tenant` overrides a package migration with the same basename, while unrelated custom tenant migration paths remain configured.
+
+After updating, verify the central login, tenant provisioning, `tenants:migrate`, tenant authentication logs, generated central and tenant Wayfinder routes, and the frontend build. Use `--breaking-changes` only for this one-time 1.6.0 transition. Later 1.6.x updates use the normal commands below.
+
 Update the addon inside an installed application:
 
 ```bash

@@ -102,7 +102,7 @@ final class UpsertTenantSuperAdminAction
         if (is_string($superAdminUserId) && $superAdminUserId !== '') {
             $existingUser = $userModel::query()->find($superAdminUserId);
 
-            if ($existingUser instanceof Model && $existingUser instanceof Authenticatable) {
+            if ($existingUser !== null) {
                 return $existingUser;
             }
         }
@@ -112,7 +112,7 @@ final class UpsertTenantSuperAdminAction
         if (is_string($email) && $email !== '') {
             $existingUser = $userModel::query()->where('email', $email)->first();
 
-            if ($existingUser instanceof Model && $existingUser instanceof Authenticatable) {
+            if ($existingUser !== null) {
                 return $existingUser;
             }
         }

@@ -132,10 +132,6 @@ final class ConvertMySqlDatetimesCommand extends Command
         }
 
         foreach ($query->cursor() as $tenant) {
-            if (! $tenant instanceof TenantContract) {
-                throw new \InvalidArgumentException('Configured tenant model must implement the tenancy tenant contract.');
-            }
-
             yield $tenant;
         }
     }
