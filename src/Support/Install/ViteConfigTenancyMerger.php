@@ -21,6 +21,12 @@ final readonly class ViteConfigTenancyMerger
 
         $contents = (string) $this->files->get($viteConfigPath);
 
+        $contents = preg_replace(
+            '/(\bpath\.(?:resolve|join|relative)\(\s*)__dirname\b/',
+            '$1import.meta.dirname',
+            $contents,
+        ) ?? $contents;
+        $contents = $this->removeObsoleteDirnameCompatibility($contents);
         $contents = $this->mergeLanguagePath($contents);
 
         if (str_contains($contents, 'function resolveCorePanelTenancyImport(')) {
@@ -58,32 +64,133 @@ final readonly class ViteConfigTenancyMerger
         $this->files->put($viteConfigPath, $updatedContents);
     }
 
+    private function removeObsoleteDirnameCompatibility(string $contents): string
+    {
+        $withoutDeclaration = preg_replace(
+            '/^[ \t]*const\s+__dirname\s*=\s*dirname\(\s*fileURLToPath\(\s*import\.meta\.url\s*\)\s*\)\s*;?[ \t]*\R?/m',
+            '',
+            $contents,
+            1,
+            $replacements,
+        ) ?? $contents;
+
+        $usesFilenameCompatibility = false;
+
+        if ($replacements !== 1) {
+            $withoutDeclaration = preg_replace(
+                '/^[ \t]*const\s+__dirname\s*=\s*dirname\(\s*__filename\s*\)\s*;?[ \t]*\R?/m',
+                '',
+                $contents,
+                1,
+                $replacements,
+            ) ?? $contents;
+            $usesFilenameCompatibility = $replacements === 1;
+        }
+
+        if ($replacements !== 1 || preg_match('/\b__dirname\b/', $withoutDeclaration) === 1) {
+            return $contents;
+        }
+
+        if ($usesFilenameCompatibility
+            && preg_match_all('/\b__filename\b/', $withoutDeclaration) === 1) {
+            $withoutDeclaration = preg_replace(
+                '/^[ \t]*const\s+__filename\s*=\s*fileURLToPath\(\s*import\.meta\.url\s*\)\s*;?[ \t]*\R?/m',
+                '',
+                $withoutDeclaration,
+                1,
+            ) ?? $withoutDeclaration;
+        }
+
+        foreach (['node:path', 'path'] as $pathSource) {
+            $withoutDeclaration = $this->removeUnusedNamedImport($withoutDeclaration, $pathSource, 'dirname');
+        }
+
+        foreach (['node:url', 'url'] as $urlSource) {
+            $withoutDeclaration = $this->removeUnusedNamedImport($withoutDeclaration, $urlSource, 'fileURLToPath');
+        }
+
+        return $withoutDeclaration;
+    }
+
+    private function removeUnusedNamedImport(string $contents, string $source, string $identifier): string
+    {
+        if (preg_match_all('/(?<![A-Za-z0-9_$.])'.preg_quote($identifier, '/').'\b/', $contents) !== 1) {
+            return $contents;
+        }
+
+        $pattern = '/^(?<indent>[ \t]*)import\s+(?:(?<default>[A-Za-z_$][A-Za-z0-9_$]*)\s*,\s*)?'
+            .'\{\s*(?<named>[^}]*)\s*\}\s+from\s+(?<quote>[\'\"])'.preg_quote($source, '/').'\k<quote>\s*;?[ \t]*(?<newline>\R|$)/m';
+
+        return preg_replace_callback($pattern, static function (array $matches) use ($identifier, $source): string {
+            $namedImports = array_values(array_filter(
+                array_map('trim', explode(',', $matches['named'])),
+                static fn (string $namedImport): bool => $namedImport !== $identifier,
+            ));
+
+            if (count($namedImports) === count(array_filter(array_map('trim', explode(',', $matches['named']))))) {
+                return $matches[0];
+            }
+
+            $defaultImport = $matches['default'] ?? '';
+
+            if ($namedImports === []) {
+                if ($defaultImport === '') {
+                    return '';
+                }
+
+                return $matches['indent'].'import '.$defaultImport.' from '.$matches['quote']
+                    .$source.$matches['quote'].$matches['newline'];
+            }
+
+            return $matches['indent'].'import '
+                .($defaultImport !== '' ? $defaultImport.', ' : '')
+                .'{ '.implode(', ', $namedImports).' } from '.$matches['quote']
+                .$source.$matches['quote'].$matches['newline'];
+        }, $contents, 1) ?? $contents;
+    }
+
     private function mergeLanguagePath(string $contents): string
     {
-        $tenancyLanguagePath = "    path.resolve(__dirname, 'vendor/mapo-89/core-panel-tenancy/resources/lang'),\n";
+        $tenancyLanguagePath = <<<'TS'
+    path.resolve(
+        import.meta.dirname,
+        'vendor/mapo-89/core-panel-tenancy/resources/lang',
+    ),
+TS;
+        $tenancyLanguagePath .= "\n";
 
-        if (str_contains($contents, trim($tenancyLanguagePath))) {
+        if (str_contains($contents, "'vendor/mapo-89/core-panel-tenancy/resources/lang'")) {
             return $contents;
         }
 
-        $corePanelLanguagePath = "    path.resolve(__dirname, 'vendor/mapo-89/core-panel/resources/lang'),\n";
+        $corePanelLanguagePaths = [
+            <<<'TS'
+    path.resolve(
+        import.meta.dirname,
+        'vendor/mapo-89/core-panel/resources/lang',
+    ),
+TS."\n",
+            "    path.resolve(import.meta.dirname, 'vendor/mapo-89/core-panel/resources/lang'),\n",
+        ];
 
-        if (! str_contains($contents, $corePanelLanguagePath)) {
-            return $contents;
+        foreach ($corePanelLanguagePaths as $corePanelLanguagePath) {
+            if (str_contains($contents, $corePanelLanguagePath)) {
+                return str_replace(
+                    $corePanelLanguagePath,
+                    $corePanelLanguagePath.$tenancyLanguagePath,
+                    $contents,
+                );
+            }
         }
 
-        return str_replace(
-            $corePanelLanguagePath,
-            $corePanelLanguagePath.$tenancyLanguagePath,
-            $contents,
-        );
+        return $contents;
     }
 
     private static function tenancyPackagePath(): string
     {
         return <<<'TS'
 const tenancyPackageJsPath = path.resolve(
-    __dirname,
+    import.meta.dirname,
     'vendor/mapo-89/core-panel-tenancy/resources/js',
 )
 

@@ -491,7 +491,13 @@ it('adds the tenancy import alias only when the tenancy addon is installed', fun
 
     expect($contents)->toContain('const tenancyPackageJsPath = path.resolve(')
         ->and($contents)->toContain('vendor/mapo-89/core-panel-tenancy/resources/js')
-        ->and($contents)->toContain("path.resolve(__dirname, 'vendor/mapo-89/core-panel-tenancy/resources/lang')")
+        ->and($contents)->toContain(<<<'TS'
+    path.resolve(
+        import.meta.dirname,
+        'vendor/mapo-89/core-panel-tenancy/resources/lang',
+    ),
+TS)
+        ->and($contents)->not->toContain('__dirname')
         ->and($contents)->toContain('function resolveCorePanelTenancyImport(importee: string): string | null {')
         ->and($contents)->toContain("importee.startsWith('@core-panel-tenancy/')")
         ->and($contents)->toContain('resolveCorePanelTenancyImport(importee) ??')
@@ -514,6 +520,117 @@ it('adds missing tenancy translations to an already merged vite config', functio
 
     expect(substr_count($contents, 'vendor/mapo-89/core-panel-tenancy/resources/lang'))
         ->toBe(1);
+});
+
+it('removes an orphaned ESM dirname compatibility block after migrating path expressions', function (
+    string $pathSource,
+    string $urlSource,
+): void {
+    $basePath = makeTenancyUpdateBasePath('vite-config-dirname-compatibility');
+    $viteConfigPath = $basePath.'/vite.config.ts';
+    $contents = str_replace(
+        "import path from 'node:path'",
+        implode(PHP_EOL, [
+            "import path, { dirname } from '{$pathSource}'",
+            "import { fileURLToPath } from '{$urlSource}'",
+            '',
+            'const __dirname = dirname(fileURLToPath(import.meta.url))',
+        ]),
+        (string) file_get_contents(__DIR__.'/../../../core-panel/stubs/vite.config.ts'),
+    );
+    $contents = str_replace('import.meta.dirname', '__dirname', $contents);
+
+    mkdir($basePath, 0777, true);
+    file_put_contents($viteConfigPath, $contents);
+
+    app(ViteConfigTenancyMerger::class)->merge($basePath);
+
+    $mergedContents = (string) file_get_contents($viteConfigPath);
+
+    expect($mergedContents)
+        ->not->toContain('const __dirname = dirname(fileURLToPath(import.meta.url))')
+        ->not->toContain('const import.meta.dirname =')
+        ->not->toContain('fileURLToPath')
+        ->not->toContain('{ dirname }')
+        ->toContain("import path from '{$pathSource}'")
+        ->toContain("path.resolve(import.meta.dirname, 'resources/js')")
+        ->toContain('vendor/mapo-89/core-panel-tenancy/resources/js')
+        ->toContain('vendor/mapo-89/core-panel-tenancy/resources/lang');
+})->with([
+    'node-prefixed specifiers' => ['node:path', 'node:url'],
+    'bare specifiers' => ['path', 'url'],
+]);
+
+it('removes an orphaned two-step ESM dirname compatibility block after migrating path expressions', function (
+    string $pathSource,
+    string $urlSource,
+): void {
+    $basePath = makeTenancyUpdateBasePath('vite-config-two-step-dirname-compatibility');
+    $viteConfigPath = $basePath.'/vite.config.ts';
+    $compatibilityBlock = implode("\n", [
+        "import path, { dirname } from '{$pathSource}'",
+        "import { fileURLToPath } from '{$urlSource}'",
+        '',
+        'const __filename = fileURLToPath(import.meta.url)',
+        'const __dirname = dirname(__filename)',
+    ]);
+    $contents = str_replace(
+        "import path from 'node:path'",
+        $compatibilityBlock,
+        (string) file_get_contents(__DIR__.'/../../../core-panel/stubs/vite.config.ts'),
+    );
+    $contents = str_replace('import.meta.dirname', '__dirname', $contents);
+
+    mkdir($basePath, 0777, true);
+    file_put_contents($viteConfigPath, $contents);
+
+    app(ViteConfigTenancyMerger::class)->merge($basePath);
+
+    $mergedContents = (string) file_get_contents($viteConfigPath);
+
+    expect($mergedContents)
+        ->not->toContain('const __filename = fileURLToPath(import.meta.url)')
+        ->not->toContain('const __dirname = dirname(__filename)')
+        ->not->toContain('fileURLToPath')
+        ->not->toContain('{ dirname }')
+        ->toContain("import path from '{$pathSource}'")
+        ->toContain("path.resolve(import.meta.dirname, 'resources/js')")
+        ->toContain('vendor/mapo-89/core-panel-tenancy/resources/js')
+        ->toContain('vendor/mapo-89/core-panel-tenancy/resources/lang');
+})->with([
+    'node-prefixed specifiers' => ['node:path', 'node:url'],
+    'bare specifiers' => ['path', 'url'],
+]);
+
+it('preserves an ESM dirname compatibility block when dirname remains in use', function (): void {
+    $basePath = makeTenancyUpdateBasePath('vite-config-dirname-compatibility-in-use');
+    $viteConfigPath = $basePath.'/vite.config.ts';
+    $contents = str_replace(
+        "import path from 'node:path'",
+        implode(PHP_EOL, [
+            "import path, { dirname } from 'node:path'",
+            "import { fileURLToPath } from 'node:url'",
+            '',
+            'const __dirname = dirname(fileURLToPath(import.meta.url))',
+        ]),
+        (string) file_get_contents(__DIR__.'/../../../core-panel/stubs/vite.config.ts'),
+    );
+    $contents = str_replace('import.meta.dirname', '__dirname', $contents);
+    $contents .= PHP_EOL."export const compatibilityDirectory = __dirname\n";
+
+    mkdir($basePath, 0777, true);
+    file_put_contents($viteConfigPath, $contents);
+
+    app(ViteConfigTenancyMerger::class)->merge($basePath);
+
+    $mergedContents = (string) file_get_contents($viteConfigPath);
+
+    expect($mergedContents)
+        ->toContain('const __dirname = dirname(fileURLToPath(import.meta.url))')
+        ->toContain("import path, { dirname } from 'node:path'")
+        ->toContain("import { fileURLToPath } from 'node:url'")
+        ->toContain('export const compatibilityDirectory = __dirname')
+        ->toContain("path.resolve(import.meta.dirname, 'resources/js')");
 });
 
 it('configures Media Library to use the tenant-aware URL generator when the addon is loaded', function (): void {
@@ -635,6 +752,47 @@ TS,
         ->and($contents)->not->toContain('https://core-panel-app.test/profile')
         ->and($contents)->not->toContain('https:/profile');
 });
+
+it('composes generated wayfinder controller methods onto multi-route default exports', function (string $lineEnding): void {
+    $basePath = sys_get_temp_dir().'/core-panel-wayfinder-actions-'.bin2hex(random_bytes(8));
+    $actionsPath = $basePath.'/resources/js/actions/CorePanel/Http/Controllers/Auth';
+
+    mkdir($actionsPath, 0777, true);
+
+    $generatedAction = <<<'TS'
+const SocialiteCallbackController = {
+    '/auth/{provider}/callback': centralCallback,
+    'tenant /auth/{provider}/callback': tenantCallback,
+}
+
+export const showConflict = {}
+export const resolveConflict = {}
+
+SocialiteCallbackController.showConflict = showConflict
+SocialiteCallbackController.resolveConflict = resolveConflict
+
+export default SocialiteCallbackController
+TS;
+    file_put_contents(
+        $actionsPath.'/SocialiteCallbackController.ts',
+        str_replace("\n", $lineEnding, $generatedAction),
+    );
+
+    app(WayfinderRouteUrlNormalizer::class)->normalize($basePath);
+
+    $contents = file_get_contents($actionsPath.'/SocialiteCallbackController.ts');
+
+    expect($contents)
+        ->toContain('export default Object.assign(SocialiteCallbackController, {')
+        ->toContain('    showConflict,')
+        ->toContain('    resolveConflict,')
+        ->not->toContain('SocialiteCallbackController.showConflict = showConflict')
+        ->not->toContain('SocialiteCallbackController.resolveConflict = resolveConflict')
+        ->and(preg_match('/(?<!\r)\n/', $contents))->toBe($lineEnding === "\r\n" ? 0 : 1);
+})->with([
+    'LF' => ["\n"],
+    'CRLF' => ["\r\n"],
+]);
 
 it('normalizes url-like central domain inputs to bare hosts during tenancy installation', function (): void {
     $command = app(InstallTenancyCommand::class);
