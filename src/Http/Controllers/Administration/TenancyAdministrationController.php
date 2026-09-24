@@ -196,15 +196,7 @@ final class TenancyAdministrationController extends Controller
 
     private function canManageDatabaseBackupSettings(Authenticatable $user): bool
     {
-        if (method_exists($user, 'hasPermissionTo')) {
-            if (! $this->permissions->permissionExists('database-backups.update')) {
-                return false;
-            }
-
-            return $user->hasPermissionTo('database-backups.update');
-        }
-
-        return $this->permissions->userHas($user, 'database-backups.update');
+        return $this->permissions->userHasAssignedPermission($user, 'database-backups.update');
     }
 
     private function sourceFilter(Request $request): string
