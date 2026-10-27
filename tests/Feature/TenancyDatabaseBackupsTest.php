@@ -6,7 +6,9 @@ use CorePanel\Contracts\SystemUpdateSettingsAccess;
 use CorePanel\Http\Controllers\Administration\AdministrationController;
 use CorePanel\Http\Middleware\CheckPermission;
 use CorePanel\Http\Middleware\EnsureCorePanelEmailIsVerified;
+use CorePanel\Support\Administration\DatabaseBackups\DatabaseBackupEncryptor;
 use CorePanel\Support\Administration\DatabaseBackups\DatabaseBackupRestoreStatus;
+use CorePanel\Support\Administration\DatabaseBackups\DatabaseBackupSettings;
 use CorePanel\Support\Administration\SystemUpdates\ApplicationHealthUrl;
 use CorePanel\Tests\FakeUser;
 use CorePanelTenancy\Http\Controllers\Administration\TenancyAdministrationController;
@@ -18,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Configuration\ApplicationBuilder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Process\PendingProcess;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -251,6 +254,122 @@ it('applies the configured import size limit to uploaded backup archives', funct
         ->assertRedirect(route('core-panel.administration.index'))
         ->assertSessionHasErrors('backup');
 });
+
+it('lists large backup sets from their manifest without extracting database files', function (bool $encrypted): void {
+    $path = $this->backupPath.'/large-set.zip';
+    $manifest = [
+        'kind' => 'set',
+        'created_at' => '2026-10-26T23:25:22+00:00',
+        'failed_tenants' => [],
+        'tenants' => [['id' => 'tenant-alpha', 'label' => 'Alpha', 'file' => 'tenants/alpha.dump']],
+    ];
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('manifest.json', json_encode($manifest, JSON_THROW_ON_ERROR));
+    $zip->addFromString('central.sql', str_repeat('x', 8192));
+    $zip->close();
+
+    if ($encrypted) {
+        app(DatabaseBackupEncryptor::class)->encryptFile($path, $path.'.enc', app(DatabaseBackupSettings::class)->encryptionCode());
+        File::delete($path);
+        $path .= '.enc';
+    }
+
+    config()->set('core-panel.administration.database_backups.import_max_size_kb', 1);
+    $temporaryFiles = File::glob(storage_path('framework/cache/database-backup-*'));
+    $service = app(TenancyDatabaseBackupService::class);
+    $backup = $service->list()->sole();
+
+    expect($backup->name)->toBe(basename($path))
+        ->and($backup->encrypted)->toBe($encrypted)
+        ->and($backup->toArray()['tenant_options'])->toBe([['id' => 'tenant-alpha', 'label' => 'Alpha']])
+        ->and($service->find(basename($path))->createdAt->toIso8601String())->toBe('2026-10-26T23:25:22+00:00')
+        ->and(File::glob(storage_path('framework/cache/database-backup-*')))->toBe($temporaryFiles);
+
+    expect(fn (): mixed => $service->extractArchive(basename($path)))->toThrow(RuntimeException::class);
+})->with([false, true]);
+
+it('still rejects oversized zip content when importing an otherwise valid manifest', function (): void {
+    $path = corePanelTestTemporaryPath('large-import').'.zip';
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('manifest.json', json_encode(['kind' => 'set', 'tenants' => []], JSON_THROW_ON_ERROR));
+    $zip->addFromString('central.sql', str_repeat('x', 8192));
+    $zip->close();
+    config()->set('core-panel.administration.database_backups.import_max_size_kb', 1);
+
+    try {
+        $upload = UploadedFile::fake()->createWithContent('large.zip', (string) File::get($path));
+
+        expect(fn (): mixed => app(TenancyDatabaseBackupService::class)->importUploaded($upload))
+            ->toThrow(RuntimeException::class)
+            ->and(File::files($this->backupPath))->toBeEmpty();
+    } finally {
+        File::delete($path);
+    }
+});
+
+it('invalidates cached manifest metadata when an archive changes', function (): void {
+    $path = $this->backupPath.'/changing-set.zip';
+    $service = app(TenancyDatabaseBackupService::class);
+
+    foreach (['First tenant', 'Updated tenant label'] as $index => $label) {
+        $zip = new ZipArchive;
+        $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        $zip->addFromString('manifest.json', json_encode([
+            'kind' => 'set',
+            'tenants' => [['id' => 'alpha', 'label' => $label]],
+        ], JSON_THROW_ON_ERROR));
+        $zip->close();
+        touch($path, time() + $index);
+
+        expect($service->find(basename($path))->toArray()['tenant_options'][0]['label'])->toBe($label);
+    }
+});
+
+it('creates its own large backup sets without applying the upload limit during retention', function (): void {
+    config()->set('tenancy.database.central_connection', 'pgsql');
+    config()->set('database.connections.pgsql', [
+        'driver' => 'pgsql', 'database' => 'backup-test', 'host' => 'localhost', 'port' => 5432, 'username' => 'test',
+    ]);
+    config()->set('core-panel.administration.database_backups.import_max_size_kb', 1);
+
+    Process::fake(function (PendingProcess $process) {
+        foreach ((array) $process->command as $argument) {
+            if (is_string($argument) && str_starts_with($argument, '--file=')) {
+                File::put(substr($argument, 7), str_repeat('x', 8192));
+            }
+        }
+
+        return Process::result();
+    });
+
+    $service = app(TenancyDatabaseBackupService::class);
+    $backup = $service->create('automatic', 'full_set');
+
+    expect(File::exists($backup->path))->toBeTrue()
+        ->and($service->list()->sole()->name)->toBe($backup->name);
+});
+
+it('rejects oversized manifests without leaving decrypted files behind', function (bool $encrypted): void {
+    $path = $this->backupPath.'/large-manifest.zip';
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('manifest.json', json_encode(['padding' => str_repeat('x', 1048576)], JSON_THROW_ON_ERROR));
+    $zip->close();
+
+    if ($encrypted) {
+        app(DatabaseBackupEncryptor::class)->encryptFile($path, $path.'.enc', app(DatabaseBackupSettings::class)->encryptionCode());
+        File::delete($path);
+        $path .= '.enc';
+    }
+
+    $temporaryFiles = File::glob(storage_path('framework/cache/database-backup-*'));
+
+    expect(fn (): mixed => app(TenancyDatabaseBackupService::class)->find(basename($path)))
+        ->toThrow(RuntimeException::class)
+        ->and(File::glob(storage_path('framework/cache/database-backup-*')))->toBe($temporaryFiles);
+})->with([false, true]);
 
 it('filters the administration backup table by content scope', function (): void {
     $user = FakeUser::query()->create([

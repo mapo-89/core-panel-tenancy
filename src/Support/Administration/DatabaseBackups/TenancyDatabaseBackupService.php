@@ -11,6 +11,7 @@ use CorePanel\Support\Administration\DatabaseBackups\DatabaseBackupSettings;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
@@ -19,6 +20,8 @@ use ZipArchive;
 
 final class TenancyDatabaseBackupService
 {
+    private const MAXIMUM_MANIFEST_BYTES = 1048576;
+
     public function __construct(
         private readonly DatabaseBackupEncryptor $encryptor,
         private readonly DatabaseBackupSettings $coreSettings,
@@ -41,6 +44,7 @@ final class TenancyDatabaseBackupService
         $path = $this->pathFor($name);
 
         if (File::isFile($path)) {
+            Cache::forget($this->manifestCacheKey($path));
             File::delete($path);
         }
     }
@@ -109,6 +113,11 @@ final class TenancyDatabaseBackupService
         try {
             $file->move($this->ensureDirectoryExists(), $importedName);
             clearstatcache(true, $targetPath);
+
+            if ($extension === 'zip') {
+                $archive = $this->extractArchive($importedName);
+                $this->cleanupExtractedArchive($archive);
+            }
 
             $backup = $this->fileFromPath($targetPath);
             $this->enforceRetention();
@@ -314,6 +323,7 @@ final class TenancyDatabaseBackupService
                 File::delete($workingArchivePath);
             }
 
+            Cache::put($this->manifestCacheKey($archivePath), $manifest, now()->addDay());
             $this->enforceRetention();
 
             /** @var TenancyDatabaseBackupFile $backup */
@@ -455,40 +465,102 @@ final class TenancyDatabaseBackupService
         return max(1, (int) config('core-panel.administration.database_backups.import_max_size_kb', 1048576)) * 1024;
     }
 
+    private function manifestCacheKey(string $path): string
+    {
+        clearstatcache(true, $path);
+
+        return 'core-panel-tenancy:backup-manifest:'.hash('sha256', $path.':'.File::size($path).':'.File::lastModified($path));
+    }
+
+    /** @return array<string, mixed> */
+    private function readArchiveManifest(string $path): array
+    {
+        $cacheKey = $this->manifestCacheKey($path);
+        $cached = Cache::get($cacheKey);
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $temporaryPath = null;
+        $zip = new ZipArchive;
+        $opened = false;
+
+        try {
+            $workingPath = $path;
+
+            if ($this->encryptor->isEncrypted($path)) {
+                $temporaryPath = storage_path('framework/cache/database-backup-manifest-'.bin2hex(random_bytes(8)).'.zip');
+                File::ensureDirectoryExists(dirname($temporaryPath));
+                $this->encryptor->decryptFileWithCodes($path, $temporaryPath, $this->coreSettings->encryptionCodes());
+                $workingPath = $temporaryPath;
+            }
+
+            if ($zip->open($workingPath, ZipArchive::RDONLY) !== true) {
+                throw new RuntimeException('Database backup archive could not be opened.');
+            }
+
+            $opened = true;
+            $entry = $zip->statName('manifest.json');
+
+            if ($entry === false || $entry['size'] > self::MAXIMUM_MANIFEST_BYTES) {
+                throw new RuntimeException('Database backup archive manifest is missing or too large.');
+            }
+
+            $contents = $zip->getFromName('manifest.json', self::MAXIMUM_MANIFEST_BYTES + 1);
+
+            if (! is_string($contents) || trim($contents) === '' || strlen($contents) > self::MAXIMUM_MANIFEST_BYTES) {
+                throw new RuntimeException('Database backup archive manifest is missing or too large.');
+            }
+
+            $manifest = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
+
+            if (! is_array($manifest) || array_is_list($manifest)) {
+                throw new RuntimeException('Database backup archive manifest is invalid.');
+            }
+
+            Cache::put($cacheKey, $manifest, now()->addDay());
+
+            return $manifest;
+        } finally {
+            if ($opened) {
+                $zip->close();
+            }
+
+            if ($temporaryPath !== null) {
+                File::delete($temporaryPath);
+            }
+        }
+    }
+
     private function fileFromPath(string $path): DatabaseBackupFile|TenancyDatabaseBackupFile
     {
         $name = basename($path);
 
         if (str_ends_with($name, '.zip') || str_ends_with($name, '.zip.enc')) {
-            $archive = $this->extractArchive($name);
+            $manifest = $this->readArchiveManifest($path);
+            $tenantOptions = collect((array) ($manifest['tenants'] ?? []))
+                ->map(fn (array $tenant): array => [
+                    'id' => (string) ($tenant['id'] ?? ''),
+                    'label' => (string) ($tenant['label'] ?? $tenant['id'] ?? ''),
+                ])
+                ->filter(fn (array $tenant): bool => $tenant['id'] !== '')
+                ->values()
+                ->all();
 
-            try {
-                $manifest = $archive->manifest;
-                $tenantOptions = collect((array) ($manifest['tenants'] ?? []))
-                    ->map(fn (array $tenant): array => [
-                        'id' => (string) ($tenant['id'] ?? ''),
-                        'label' => (string) ($tenant['label'] ?? $tenant['id'] ?? ''),
-                    ])
-                    ->filter(fn (array $tenant): bool => $tenant['id'] !== '')
-                    ->values()
-                    ->all();
-
-                return new TenancyDatabaseBackupFile(
-                    name: $name,
-                    path: $path,
-                    size: File::size($path),
-                    createdAt: Carbon::parse((string) ($manifest['created_at'] ?? now()->toIso8601String())),
-                    encrypted: str_ends_with($name, '.enc'),
-                    storageLocations: ['local'],
-                    kind: 'set',
-                    containsTenants: true,
-                    failedTenantsCount: count((array) ($manifest['failed_tenants'] ?? [])),
-                    tenantOptions: $tenantOptions,
-                    restoreScopes: ['central_only', 'single_tenant', 'full_set'],
-                );
-            } finally {
-                $this->cleanupExtractedArchive($archive);
-            }
+            return new TenancyDatabaseBackupFile(
+                name: $name,
+                path: $path,
+                size: File::size($path),
+                createdAt: Carbon::parse((string) ($manifest['created_at'] ?? now()->toIso8601String())),
+                encrypted: str_ends_with($name, '.enc'),
+                storageLocations: ['local'],
+                kind: 'set',
+                containsTenants: true,
+                failedTenantsCount: count((array) ($manifest['failed_tenants'] ?? [])),
+                tenantOptions: $tenantOptions,
+                restoreScopes: ['central_only', 'single_tenant', 'full_set'],
+            );
         }
 
         return new DatabaseBackupFile(
